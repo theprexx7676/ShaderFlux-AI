@@ -130,72 +130,74 @@ examples/
 
 Goal: reliable, testable access to the compilers and validators, with clear errors when they are missing.
 
+**Phase 2 progress:** the runner, discovery, `doctor`, backend interfaces, glslang/glslc, SPIRV-Cross and SPIRV-Tools backends are implemented and tested against the real tools (Ubuntu packages). The DXC backend is implemented but **unverified**, because `dxc` could not be installed in the development environment. Real-tool findings are in `docs/tools.md`.
+
 ### 2.1 Tool inventory and acquisition
-- [ ] 2.1.1 List tools to support: `dxc`, `spirv-cross`, `spirv-val`, `spirv-opt`, `spirv-dis`, `spirv-as`, `glslangValidator` and/or `glslc`. Optional later: `slangc`, `naga`, `tint`.
-- [ ] 2.1.2 For each tool record: purpose, license (**VERIFY**), how users install it (package manager, Vulkan SDK, release binary), and the minimum version we test against.
-- [ ] 2.1.3 Check maintenance status for each (last release date, recent commits, open critical issues). Record the result in `docs/tools.md`. This resolves the unconfirmed claims in 0.4.
-- [ ] 2.1.4 Decide how CI gets the tools: Vulkan SDK download, distro packages, or release binaries from the projects' GitHub releases. Pin versions and checksums.
+- [x] 2.1.1 List tools to support: `dxc`, `spirv-cross`, `spirv-val`, `spirv-opt`, `spirv-dis`, `spirv-as`, `glslangValidator` and/or `glslc`. Optional later: `slangc`, `naga`, `tint`.
+- [ ] 2.1.2 For each tool record: purpose, license (**VERIFY**), how users install it (package manager, Vulkan SDK, release binary), and the minimum version we test against. *(Partial: inventory and install hints are in `docs/tools.md` and `THIRD_PARTY.md`; licenses still unverified.)*
+- [ ] 2.1.3 Check maintenance status for each (last release date, recent commits, open critical issues). Record the result in `docs/tools.md`. This resolves the unconfirmed claims in 0.4. *(Not done: web evidence for SPIRV-Cross and ShaderConductor activity was inconclusive.)*
+- [ ] 2.1.4 Decide how CI gets the tools: Vulkan SDK download, distro packages, or release binaries from the projects' GitHub releases. Pin versions and checksums. *(Not done: needs a decision (Vulkan SDK download vs distro packages vs release binaries). Ubuntu's `spirv-cross` is a 2021 build.)*
 - [ ] 2.1.5 Write `scripts/install_tools_ci.sh` for Linux and equivalents for Windows and macOS only if needed.
 - **Acceptance:** CI can run `dxc --version` and `spirv-cross --help` on Linux.
 
 ### 2.2 Subprocess runner
-- [ ] 2.2.1 Implement `run_tool(args, input=None, timeout, cwd, env)` returning `ToolRun(returncode, stdout, stderr, duration, command)`.
-- [ ] 2.2.2 Never use `shell=True`. Pass argument lists only. Reject paths containing NUL.
-- [ ] 2.2.3 Enforce a timeout and kill the whole process group on timeout.
-- [ ] 2.2.4 Cap captured output size to avoid memory blowups from runaway tools.
-- [ ] 2.2.5 Run in a fresh temp directory per invocation. Clean it up on success and optionally keep it with `--keep-temp`.
-- [ ] 2.2.6 Redact home directory and API-key-like strings from stored command lines.
-- [ ] 2.2.7 Unit tests with a fake executable (small Python script) for: success, non-zero exit, timeout, huge output, missing binary.
+- [x] 2.2.1 Implement `run_tool(args, input=None, timeout, cwd, env)` returning `ToolRun(returncode, stdout, stderr, duration, command)`.
+- [x] 2.2.2 Never use `shell=True`. Pass argument lists only. Reject paths containing NUL.
+- [x] 2.2.3 Enforce a timeout and kill the whole process group on timeout.
+- [x] 2.2.4 Cap captured output size to avoid memory blowups from runaway tools.
+- [x] 2.2.5 Run in a fresh temp directory per invocation. Clean it up on success and optionally keep it with `--keep-temp`. *(`workspace(keep=...)` exists; the `--keep-temp` CLI flag is wired in phase 8.)*
+- [x] 2.2.6 Redact home directory and API-key-like strings from stored command lines.
+- [x] 2.2.7 Unit tests with a fake executable (small Python script) for: success, non-zero exit, timeout, huge output, missing binary.
 - **Acceptance:** all failure modes produce typed errors, never hangs or tracebacks.
 
 ### 2.3 Tool discovery and `doctor`
-- [ ] 2.3.1 Discover tools via config path, then `PATH`, then well-known locations (`VULKAN_SDK`).
-- [ ] 2.3.2 Query each tool's version and parse it into a comparable structure.
-- [ ] 2.3.3 Compare with the tested range. Warn on untested versions. Error below the minimum.
-- [ ] 2.3.4 Implement `shaderflux doctor` printing a table: tool, path, version, status, install hint per OS.
-- [ ] 2.3.5 Add `--json` output for bug reports.
-- [ ] 2.3.6 Unit tests with mocked version outputs.
+- [x] 2.3.1 Discover tools via config path, then `PATH`, then well-known locations (`VULKAN_SDK`).
+- [x] 2.3.2 Query each tool's version and parse it into a comparable structure.
+- [ ] 2.3.3 Compare with the tested range. Warn on untested versions. Error below the minimum. *(Partial: minimum-version check is implemented, but no minimums are set yet because no version has been tested as a floor.)*
+- [x] 2.3.4 Implement `shaderflux doctor` printing a table: tool, path, version, status, install hint per OS.
+- [x] 2.3.5 Add `--json` output for bug reports.
+- [x] 2.3.6 Unit tests with mocked version outputs.
 - **Acceptance:** on a machine with no tools, `doctor` lists each missing tool with an install hint and exits non-zero.
 
 ### 2.4 Backend interfaces
-- [ ] 2.4.1 Define `CompilerBackend` protocol: `compile(source, stage, entry, defines, includes, target) -> CompileResult`.
-- [ ] 2.4.2 Define `CrossCompilerBackend`: `convert(spirv, target_lang, options) -> ConvertResult`.
-- [ ] 2.4.3 Define `ValidatorBackend`: `validate(spirv, env) -> list[Diagnostic]`.
-- [ ] 2.4.4 `CompileResult` carries output bytes/text, diagnostics, tool name, version, exact command.
-- [ ] 2.4.5 Registry so a backend can be swapped or added without touching the pipeline.
+- [x] 2.4.1 Define `CompilerBackend` protocol: `compile(source, stage, entry, defines, includes, target) -> CompileResult`.
+- [x] 2.4.2 Define `CrossCompilerBackend`: `convert(spirv, target_lang, options) -> ConvertResult`.
+- [x] 2.4.3 Define `ValidatorBackend`: `validate(spirv, env) -> list[Diagnostic]`.
+- [x] 2.4.4 `CompileResult` carries output bytes/text, diagnostics, tool name, version, exact command.
+- [x] 2.4.5 Registry so a backend can be swapped or added without touching the pipeline.
 - **Acceptance:** a fake backend can be registered in tests and used by the pipeline.
 
 ### 2.5 DXC backend
-- [ ] 2.5.1 HLSL to DXIL compile (for "does this compile for D3D12" checks).
-- [ ] 2.5.2 HLSL to SPIR-V compile with `-spirv` and a configurable target environment (for example Vulkan 1.2). **VERIFY** flag names with `dxc --help`.
-- [ ] 2.5.3 Pass entry point, stage profile (`vs_6_x`, `ps_6_x`, `cs_6_x`...), defines, include dirs.
-- [ ] 2.5.4 Map binding options (`-fvk-b-shift`, `-fvk-t-shift`, `-fvk-s-shift`, `-fvk-u-shift`, `-fvk-bind-register`) from our own `BindingPolicy` model. **VERIFY** exact syntax and the note that shift and bind-register options cannot be combined.
-- [ ] 2.5.5 Support `[[vk::binding]]` attribute inspection (read, not rewrite) for later analysis.
-- [ ] 2.5.6 Parse DXC diagnostics (file, line, column, severity, message) into `Diagnostic`.
-- [ ] 2.5.7 Golden tests: five tiny shaders (vertex passthrough, textured pixel, constant buffer, compute with UAV, one that fails to compile).
+- [ ] 2.5.1 HLSL to DXIL compile (for "does this compile for D3D12" checks). *(Implemented (`check_dxil`) but UNVERIFIED: no real `dxc` was available.)*
+- [ ] 2.5.2 HLSL to SPIR-V compile with `-spirv` and a configurable target environment (for example Vulkan 1.2). **VERIFY** flag names with `dxc --help`. *(Implemented but UNVERIFIED against real `dxc`; flag spellings marked VERIFY in the code.)*
+- [x] 2.5.3 Pass entry point, stage profile (`vs_6_x`, `ps_6_x`, `cs_6_x`...), defines, include dirs.
+- [ ] 2.5.4 Map binding options (`-fvk-b-shift`, `-fvk-t-shift`, `-fvk-s-shift`, `-fvk-u-shift`, `-fvk-bind-register`) from our own `BindingPolicy` model. **VERIFY** exact syntax and the note that shift and bind-register options cannot be combined. *(Implemented (`BindingPolicy`) but UNVERIFIED; exact `-fvk-*` argument forms must be checked against `dxc --help`.)*
+- [ ] 2.5.5 Support `[[vk::binding]]` attribute inspection (read, not rewrite) for later analysis. *(Moved to 4.2.1 (source analysis).)*
+- [ ] 2.5.6 Parse DXC diagnostics (file, line, column, severity, message) into `Diagnostic`. *(Implemented from the clang-style format; UNVERIFIED against real dxc output.)*
+- [ ] 2.5.7 Golden tests: five tiny shaders (vertex passthrough, textured pixel, constant buffer, compute with UAV, one that fails to compile). *(Not done: needs real `dxc`. Corpus shaders and `tests/integration/test_dxc.py` are ready and skip until it is installed.)*
 - **Acceptance:** each golden shader compiles or fails as expected, with parsed diagnostics.
 
 ### 2.6 SPIRV-Cross backend
-- [ ] 2.6.1 SPIR-V to GLSL with version and Vulkan-semantics options.
-- [ ] 2.6.2 SPIR-V to HLSL with shader model option.
-- [ ] 2.6.3 SPIR-V to MSL (kept optional, not in first release scope).
-- [ ] 2.6.4 SPIR-V reflection output (JSON) for the analysis phase.
-- [ ] 2.6.5 Parse tool errors into diagnostics.
-- [ ] 2.6.6 Golden tests converting the DXC outputs from 2.5.7.
+- [x] 2.6.1 SPIR-V to GLSL with version and Vulkan-semantics options.
+- [x] 2.6.2 SPIR-V to HLSL with shader model option.
+- [ ] 2.6.3 SPIR-V to MSL (kept optional, not in first release scope). *(Argument building implemented; no real MSL conversion has been run or tested yet.)*
+- [x] 2.6.4 SPIR-V reflection output (JSON) for the analysis phase.
+- [x] 2.6.5 Parse tool errors into diagnostics.
+- [ ] 2.6.6 Golden tests converting the DXC outputs from 2.5.7. *(Partial: a GLSL-derived module is converted to GLSL and HLSL and round-trips. DXC-derived modules wait for real `dxc`.)*
 - **Acceptance:** converted GLSL from golden SPIR-V compiles with glslang (2.8).
 
 ### 2.7 SPIRV-Tools backend
-- [ ] 2.7.1 `spirv-val` wrapper with target environment option.
-- [ ] 2.7.2 `spirv-opt` wrapper (optional, off by default; used only when asked).
-- [ ] 2.7.3 `spirv-dis` wrapper for human-readable diffs in reports.
-- [ ] 2.7.4 Validation diagnostics parser.
+- [x] 2.7.1 `spirv-val` wrapper with target environment option.
+- [x] 2.7.2 `spirv-opt` wrapper (optional, off by default; used only when asked).
+- [x] 2.7.3 `spirv-dis` wrapper for human-readable diffs in reports.
+- [x] 2.7.4 Validation diagnostics parser.
 - **Acceptance:** an intentionally broken SPIR-V file produces a diagnostic with the offending instruction.
 
 ### 2.8 glslang / glslc backend
-- [ ] 2.8.1 GLSL to SPIR-V compile with stage, `#version`, defines, include dirs.
-- [ ] 2.8.2 Decide which binary to support first (`glslangValidator` vs `glslc`). Support the one that is easier to install in CI first.
-- [ ] 2.8.3 Diagnostics parser.
-- [ ] 2.8.4 Golden tests for three GLSL shaders (vertex, fragment, compute).
+- [x] 2.8.1 GLSL to SPIR-V compile with stage, `#version`, defines, include dirs.
+- [x] 2.8.2 Decide which binary to support first (`glslangValidator` vs `glslc`). Support the one that is easier to install in CI first.
+- [x] 2.8.3 Diagnostics parser.
+- [x] 2.8.4 Golden tests for three GLSL shaders (vertex, fragment, compute).
 - **Acceptance:** GLSL input flows to SPIR-V and onward to HLSL through 2.6.
 
 ### 2.9 Optional alternative backends (not in first release)
@@ -210,14 +212,16 @@ Goal: reliable, testable access to the compilers and validators, with clear erro
 
 Goal: translate shaders end to end with no LLM, whenever the tool chain can do it.
 
+**Phase 3 progress:** only 3.1 (domain models) is done so far; it was pulled forward because the tool layer needs it.
+
 ### 3.1 Domain models
-- [ ] 3.1.1 `ShaderLanguage` enum: `hlsl`, `glsl`, `spirv`, later `msl`, `wgsl`.
-- [ ] 3.1.2 `ShaderStage` enum: vertex, fragment/pixel, compute, geometry, tessellation control/eval, mesh, task, ray stages (later).
-- [ ] 3.1.3 `ShaderSource`: path, text, language, stage, entry point, defines, include dirs, content hash.
-- [ ] 3.1.4 `Target`: language, version or shader model, API environment (Vulkan x.y, D3D12).
-- [ ] 3.1.5 `Diagnostic`: severity, message, file, line, column, code, source tool.
-- [ ] 3.1.6 `TranslationResult` and `StageResult` records, JSON serialisable.
-- [ ] 3.1.7 Typed error hierarchy: `ToolMissing`, `ToolFailed`, `InvalidInput`, `UnsupportedRoute`, `LlmError`, `VerificationFailed`.
+- [x] 3.1.1 `ShaderLanguage` enum: `hlsl`, `glsl`, `spirv`, later `msl`, `wgsl`.
+- [x] 3.1.2 `ShaderStage` enum: vertex, fragment/pixel, compute, geometry, tessellation control/eval, mesh, task, ray stages (later).
+- [x] 3.1.3 `ShaderSource`: path, text, language, stage, entry point, defines, include dirs, content hash.
+- [x] 3.1.4 `Target`: language, version or shader model, API environment (Vulkan x.y, D3D12).
+- [x] 3.1.5 `Diagnostic`: severity, message, file, line, column, code, source tool.
+- [x] 3.1.6 `TranslationResult` and `StageResult` records, JSON serialisable.
+- [x] 3.1.7 Typed error hierarchy: `ToolMissing`, `ToolFailed`, `InvalidInput`, `UnsupportedRoute`, `LlmError`, `VerificationFailed`.
 - **Acceptance:** models round-trip through JSON in unit tests.
 
 ### 3.2 Configuration
