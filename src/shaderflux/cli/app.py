@@ -5,6 +5,7 @@ from __future__ import annotations
 import typer
 
 from shaderflux import __version__
+from shaderflux.cli.doctor import doctor_command
 
 app = typer.Typer(
     name="shaderflux",
@@ -18,6 +19,9 @@ def _version_callback(value: bool) -> None:
     if value:
         typer.echo(f"shaderflux {__version__}")
         raise typer.Exit()
+
+
+app.command("doctor")(doctor_command)
 
 
 @app.callback()
