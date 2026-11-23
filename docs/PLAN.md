@@ -56,49 +56,51 @@ These are things I said before that need fixing or a caveat:
 
 Goal: a clean, buildable, tested, documented empty project that other phases can build on.
 
+**Progress:** implemented and verified locally (`make check`: ruff, mypy strict, 9 tests passing; pre-commit hooks pass; `uv` and plain `pip install -e .` both work). The CI workflow has not been observed running yet. Decisions D1 to D9 were taken at their defaults, with the copyright holder set to "ShaderFlux-AI contributors" (D7), which is easy to change.
+
 ### 1.1 Legal and project files
-- [ ] 1.1.1 Add `LICENSE` (MIT) once D7 gives the copyright holder.
-- [ ] 1.1.2 Add `NOTICE`/`THIRD_PARTY.md` listing external tools (DXC, SPIRV-Cross, SPIRV-Tools, glslang) with their licenses. **VERIFY** each license from its repository.
-- [ ] 1.1.3 Add `CODE_OF_CONDUCT.md` (Contributor Covenant).
-- [ ] 1.1.4 Add `SECURITY.md` (how to report vulnerabilities, supported versions).
-- [ ] 1.1.5 Add `CONTRIBUTING.md` (setup, test commands, commit style, how to add a test shader).
-- [ ] 1.1.6 Add `CHANGELOG.md` using Keep a Changelog format.
-- [ ] 1.1.7 Add `.gitignore` (Python, build outputs, caches, `.env`, `*.spv` outputs in scratch dirs).
-- [ ] 1.1.8 Add `.editorconfig`.
+- [x] 1.1.1 Add `LICENSE` (MIT) once D7 gives the copyright holder.
+- [ ] 1.1.2 Add `NOTICE`/`THIRD_PARTY.md` listing external tools (DXC, SPIRV-Cross, SPIRV-Tools, glslang) with their licenses. **VERIFY** each license from its repository. *(Partial: `THIRD_PARTY.md` created; licenses still unverified, to be checked in 2.1.2.)*
+- [x] 1.1.3 Add `CODE_OF_CONDUCT.md` (Contributor Covenant).
+- [x] 1.1.4 Add `SECURITY.md` (how to report vulnerabilities, supported versions).
+- [x] 1.1.5 Add `CONTRIBUTING.md` (setup, test commands, commit style, how to add a test shader).
+- [x] 1.1.6 Add `CHANGELOG.md` using Keep a Changelog format.
+- [x] 1.1.7 Add `.gitignore` (Python, build outputs, caches, `.env`, `*.spv` outputs in scratch dirs).
+- [x] 1.1.8 Add `.editorconfig`.
 - **Acceptance:** files exist, README links resolve, license matches README.
 
 ### 1.2 Python packaging
-- [ ] 1.2.1 Create `pyproject.toml` with project metadata, Python `>=3.11`, entry point `shaderflux`.
-- [ ] 1.2.2 Choose layout: `src/shaderflux/` with `__init__.py` and `py.typed`.
-- [ ] 1.2.3 Declare dependencies: `typer`, `pydantic`, `rich`, `anthropic`, `tomli-w` (if config is written), `platformdirs`.
-- [ ] 1.2.4 Declare dev dependencies: `pytest`, `pytest-cov`, `ruff`, `mypy` (or `pyright`), `pre-commit`, `hypothesis` (optional).
-- [ ] 1.2.5 Add `shaderflux --version` reading from package metadata.
-- [ ] 1.2.6 Verify `uv sync` (or chosen tool) and `pip install -e .` both work in a clean venv.
+- [x] 1.2.1 Create `pyproject.toml` with project metadata, Python `>=3.11`, entry point `shaderflux`.
+- [x] 1.2.2 Choose layout: `src/shaderflux/` with `__init__.py` and `py.typed`.
+- [x] 1.2.3 Declare dependencies: `typer`, `pydantic`, `rich`, `anthropic`, `tomli-w` (if config is written), `platformdirs`. *(Done without `tomli-w`; add it when config writing is implemented.)*
+- [x] 1.2.4 Declare dev dependencies: `pytest`, `pytest-cov`, `ruff`, `mypy` (or `pyright`), `pre-commit`, `hypothesis` (optional). *(Done without `hypothesis`; it was optional.)*
+- [x] 1.2.5 Add `shaderflux --version` reading from package metadata.
+- [x] 1.2.6 Verify `uv sync` (or chosen tool) and `pip install -e .` both work in a clean venv.
 - **Acceptance:** fresh clone to working `shaderflux --version` in under 5 commands.
 
 ### 1.3 Quality tooling
-- [ ] 1.3.1 Configure ruff (lint + format) in `pyproject.toml`.
-- [ ] 1.3.2 Configure type checking in strict mode for `src/`.
-- [ ] 1.3.3 Configure pytest: test paths, markers (`unit`, `integration`, `needs_tools`, `needs_llm`, `needs_gpu`), default to skipping the last three.
-- [ ] 1.3.4 Add `pre-commit` config (ruff, trailing whitespace, end-of-file, large-file check).
-- [ ] 1.3.5 Add a `Makefile` or `justfile` with `setup`, `lint`, `type`, `test`, `test-all`.
+- [x] 1.3.1 Configure ruff (lint + format) in `pyproject.toml`.
+- [x] 1.3.2 Configure type checking in strict mode for `src/`.
+- [x] 1.3.3 Configure pytest: test paths, markers (`unit`, `integration`, `needs_tools`, `needs_llm`, `needs_gpu`), default to skipping the last three.
+- [x] 1.3.4 Add `pre-commit` config (ruff, trailing whitespace, end-of-file, large-file check).
+- [x] 1.3.5 Add a `Makefile` or `justfile` with `setup`, `lint`, `type`, `test`, `test-all`.
 - **Acceptance:** `make lint type test` passes on the empty skeleton.
 
 ### 1.4 Continuous integration
-- [ ] 1.4.1 GitHub Actions workflow: lint, type check, unit tests on Python 3.11, 3.12, 3.13.
-- [ ] 1.4.2 Matrix over `ubuntu-latest`, `windows-latest`, `macos-latest` for unit tests (shader tools tests only on Linux at first).
-- [ ] 1.4.3 Second workflow: integration tests with shader tools installed (see 2.1 for how tools are obtained). Runs on push to main and on PRs touching `src/` or `tests/`.
-- [ ] 1.4.4 Cache pip and tool downloads.
-- [ ] 1.4.5 Upload coverage and test artifacts.
-- [ ] 1.4.6 Add a scheduled weekly job that runs the integration suite against the latest tool versions, so tool drift is detected early.
-- [ ] 1.4.7 Add Dependabot (or Renovate) for Python deps and GitHub Actions.
-- [ ] 1.4.8 Add status badges to the README only after the workflows are green.
+- [x] 1.4.1 GitHub Actions workflow: lint, type check, unit tests on Python 3.11, 3.12, 3.13.
+- [x] 1.4.2 Matrix over `ubuntu-latest`, `windows-latest`, `macos-latest` for unit tests (shader tools tests only on Linux at first).
+- [ ] 1.4.3 Second workflow: integration tests with shader tools installed (see 2.1 for how tools are obtained). Runs on push to main and on PRs touching `src/` or `tests/`. *(Deferred to 2.1.4: needs a decision on how CI obtains the shader tools.)*
+- [ ] 1.4.4 Cache pip and tool downloads. *(Not done: tool-download caching belongs with 2.1.4; pip caching to be confirmed.)*
+- [x] 1.4.5 Upload coverage and test artifacts.
+- [ ] 1.4.6 Add a scheduled weekly job that runs the integration suite against the latest tool versions, so tool drift is detected early. *(Deferred to 2.1.4, together with 1.4.3.)*
+- [x] 1.4.7 Add Dependabot (or Renovate) for Python deps and GitHub Actions.
+- [ ] 1.4.8 Add status badges to the README only after the workflows are green. *(Pending: add badges after the first green run on `main`.)*
 - **Acceptance:** green CI on a PR that only adds the skeleton.
 
 ### 1.5 Repository templates
-- [ ] 1.5.1 Issue templates: bug report (with `shaderflux doctor` output field), porting problem report, feature request.
-- [ ] 1.5.2 Pull request template (what, why, tests, docs).
-- [ ] 1.5.3 Labels: `good first issue`, `needs-repro`, `shader-corpus`, `llm`, `tooling`, `docs`.
+- [x] 1.5.1 Issue templates: bug report (with `shaderflux doctor` output field), porting problem report, feature request.
+- [x] 1.5.2 Pull request template (what, why, tests, docs).
+- [ ] 1.5.3 Labels: `good first issue`, `needs-repro`, `shader-corpus`, `llm`, `tooling`, `docs`. *(Pending: labels must be created in the GitHub repository settings.)*
 - **Acceptance:** templates appear in the GitHub UI.
 
 ### 1.6 Directory skeleton
@@ -118,8 +120,8 @@ docs/
   PLAN.md  architecture.md  guides/
 examples/
 ```
-- [ ] 1.6.1 Create empty packages with docstrings stating each package's responsibility.
-- [ ] 1.6.2 Add `docs/architecture.md` with the pipeline diagram from the README and the package responsibilities.
+- [x] 1.6.1 Create empty packages with docstrings stating each package's responsibility.
+- [x] 1.6.2 Add `docs/architecture.md` with the pipeline diagram from the README and the package responsibilities.
 - **Acceptance:** `import shaderflux.<pkg>` works for every package.
 
 ---

@@ -1,0 +1,86 @@
+[build-system]
+requires = ["hatchling>=1.24"]
+build-backend = "hatchling.build"
+
+[project]
+name = "shaderflux"
+version = "0.0.1"
+description = "An open-source assistant for porting shaders to PC: a compiler toolchain, verified by real tools, with LLM help for the hard parts."
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.11"
+authors = [{ name = "ShaderFlux-AI contributors" }]
+keywords = ["shader", "hlsl", "glsl", "spir-v", "vulkan", "directx", "transpiler"]
+classifiers = [
+  "Development Status :: 1 - Planning",
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Multimedia :: Graphics",
+  "Typing :: Typed",
+]
+dependencies = [
+  "typer>=0.12",
+  "pydantic>=2.6",
+  "rich>=13.7",
+  "anthropic>=0.40",
+  "platformdirs>=4.2",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0",
+  "pytest-cov>=5.0",
+  "ruff>=0.6",
+  "mypy>=1.10",
+  "pre-commit>=3.7",
+]
+
+[project.scripts]
+shaderflux = "shaderflux.cli.app:main"
+
+[project.urls]
+Homepage = "https://github.com/theprexx7676/ShaderFlux-AI"
+Issues = "https://github.com/theprexx7676/ShaderFlux-AI/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/shaderflux"]
+
+# ---------------------------------------------------------------- tooling
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF", "PT", "C4"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["B011"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+files = ["src"]
+plugins = ["pydantic.mypy"]
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"
+markers = [
+  "unit: fast tests with no external tools or network",
+  "integration: tests that run real external tools",
+  "needs_tools: requires dxc / spirv-cross / spirv-tools on PATH",
+  "needs_llm: requires a real LLM API key (never run in CI by default)",
+  "needs_gpu: requires a Vulkan device or a software Vulkan implementation",
+]
+
+[tool.coverage.run]
+source = ["src/shaderflux"]
+branch = true
