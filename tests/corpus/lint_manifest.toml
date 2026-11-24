@@ -1,0 +1,49 @@
+# Expected lint findings for the files in tests/corpus/lint/.
+# `rules` is the exact set of rule ids; `why` explains the intent.
+# These shaders are written for this project. HLSL files have NOT been compiled
+# with a real DXC yet, so they are lint inputs only.
+
+[[case]]
+file = "pbr_clean.hlsl"
+rules = []
+why = "explicit bindings, explicit layout, one mul convention: a false positive here is a bug"
+
+[[case]]
+file = "skinning_vs.hlsl"
+rules = ["BND001"]
+why = "cbuffer on b0 and StructuredBuffer on t0 share binding 0"
+
+[[case]]
+file = "blur_cs.hlsl"
+rules = ["BND001"]
+why = "b0, t0 and u0 share binding 0"
+
+[[case]]
+file = "shadow_ps.hlsl"
+rules = ["MAT001", "MAT002"]
+why = "mixed mul order and matrices without an explicit layout; spaces avoid a binding clash"
+
+[[case]]
+file = "tonemap_ps.hlsl"
+rules = ["INT001", "INT003"]
+why = "fmod and round"
+
+[[case]]
+file = "fullscreen_vs.hlsl"
+rules = []
+why = "no resources, no matrices"
+
+[[case]]
+file = "transpose_hack.hlsl"
+rules = ["MAT002", "MAT003"]
+why = "transpose of a constant-buffer matrix with no explicit layout"
+
+[[case]]
+file = "bone_matrices.hlsl"
+rules = ["MAT004"]
+why = "non-square matrix array"
+
+[[case]]
+file = "inverse_mod.frag"
+rules = ["INT001", "INT002"]
+why = "GLSL mod and inverse"

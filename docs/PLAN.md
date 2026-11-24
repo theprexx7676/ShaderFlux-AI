@@ -303,7 +303,7 @@ Goal: understand a shader well enough to catch porting problems before and after
 - [x] 4.3.2 Define lint rules from that table, for example: `mul` used with a vector on the left versus right, matrix declared without an explicit qualifier in a shared buffer, matrix constructed from rows or columns, use of `transpose` near uploads.
 - [x] 4.3.3 Implement a token-based detector first (fast, no AST). Move to an AST only if the experiments show false positives or negatives that need it (see 4.5).
 - [x] 4.3.4 Each finding carries: rule ID, location, explanation, suggested fix, and confidence.
-- [ ] 4.3.5 Test corpus: for each rule, one positive and one negative example. *(Partial: most rules have positive and negative tests; MAT003 and MAT005 lack a negative one, and precision and recall are not measured on a corpus yet.)*
+- [ ] 4.3.5 Test corpus: for each rule, one positive and one negative example. *(Partial: most rules have positive and negative tests. A 9-shader corpus written by the project authors scores 100% precision and recall (`tests/unit/test_lint_corpus.py`), which is a regression guard, not independent evidence; MAT003 and MAT005 still lack a negative unit test.)*
 - **Acceptance:** rule precision and recall measured on the corpus and recorded; no rule ships without a negative test.
 
 ### 4.4 Feature and intrinsic compatibility
