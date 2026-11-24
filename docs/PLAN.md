@@ -613,7 +613,7 @@ This was a README feature. It is the least defined, so it starts as analysis onl
 - [ ] 13.3.4 Evaluate usefulness with two real examples before building more.
 
 ### 13.4 Editor and CI integrations
-- [x] 13.4.1 GitHub Action wrapper running `lint` on shader changes in PRs. *(Built as `action.yml` + `scripts/action-lint.sh`; the script has tests including injection attempts, but the Action has not run on GitHub, and `codeql-action/upload-sarif@v3` must be checked against the current major version.)*
+- [x] 13.4.1 GitHub Action wrapper running `lint` on shader changes in PRs. *(Built as `action.yml` + `scripts/action-lint.sh`. The script has tests including injection attempts, and CI runs the action itself on this repository's shaders (`action-smoke` job). The SARIF upload step has never run, and `codeql-action/upload-sarif@v3` must be checked against the current major version.)*
 - [ ] 13.4.2 VS Code problem-matcher or SARIF viewing guide.
 
 ---

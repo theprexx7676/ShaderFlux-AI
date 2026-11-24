@@ -4,7 +4,7 @@
 
 ShaderFlux-AI helps developers who are porting a game or graphics project to PC and are stuck on the shader step. It wraps the standard open-source shader compilers and uses an LLM (Claude) for the parts those tools cannot do: fixing convention mismatches, mapping bindings, replacing missing intrinsics and explaining compiler errors.
 
-> **Status: early development (v0.0.1, not released).** Working today: `shaderflux lint` and `explain` for HLSL and GLSL (binding collisions, matrix-convention traps, intrinsic differences), translation of GLSL input to HLSL, GLSL or SPIR-V with SPIR-V validation and a re-check of the generated code, run reports (`--report`), `doctor`, `config show` and a GitHub Action. **Not yet proven:** HLSL *translation* has never run against a real DXC, `translate --repair` (Claude proposes small fixes, the real compiler checks them) has never run against the live API, and the GitHub Action has not run on GitHub. **Not built:** reflection and image comparison, batch mode, a `fix` command. See the [roadmap](#roadmap) and the [detailed plan](docs/PLAN.md).
+> **Status: early development (v0.0.1, not released).** Working today: `shaderflux lint` and `explain` for HLSL and GLSL (binding collisions, matrix-convention traps, intrinsic differences), translation of GLSL input to HLSL, GLSL or SPIR-V with SPIR-V validation and a re-check of the generated code, run reports (`--report`), `doctor`, `config show` and a GitHub Action. **Not yet proven:** HLSL *translation* has never run against a real DXC, `translate --repair` (Claude proposes small fixes, the real compiler checks them) has never run against the live API, and the Action's upload-to-code-scanning step has never been exercised. **Not built:** reflection and image comparison, batch mode, a `fix` command. See the [roadmap](#roadmap) and the [detailed plan](docs/PLAN.md).
 
 ## Who is this for?
 
@@ -211,7 +211,7 @@ Run the lint on every pull request that touches shaders, and see the findings in
     upload-sarif: "true"    # needs `security-events: write`
 ```
 
-A complete workflow is in [examples/workflows/lint-shaders.yml](examples/workflows/lint-shaders.yml). The script behind the Action (`scripts/action-lint.sh`) is covered by tests, including inputs that try to inject shell commands. The Action itself **has not been run on GitHub yet**, and the pinned `upload-sarif@v3` should be checked against the current major version.
+A complete workflow is in [examples/workflows/lint-shaders.yml](examples/workflows/lint-shaders.yml). The script behind the Action (`scripts/action-lint.sh`) is covered by tests, including inputs that try to inject shell commands. CI runs the Action on this repository's own shaders on every pull request: a clean shader passes, a binding collision fails the job, globs expand, and the SARIF is checked. The **upload to code scanning has not been exercised** (it needs repository permissions), and the pinned `upload-sarif@v3` should be checked against the current major version.
 
 ## Requirements
 
@@ -242,7 +242,7 @@ Only `translate --repair` talks to the network: when a shader fails to compile i
 - [x] Analysis: reflection, binding collisions, matrix and intrinsic checks, `lint` and `explain` (DXC-side verification pending)
 - [x] LLM repair loop with compiler verification (offline-tested; live API not yet exercised)
 - [x] Output re-check, verdicts and run reports
-- [x] GitHub Action for `lint` (script tested; not yet run on GitHub)
+- [x] GitHub Action for `lint` (runs in CI on this repository; SARIF upload not yet exercised)
 - [ ] Command-line tool and first release (no release yet)
 - [ ] Test corpus and benchmarks
 - [ ] Batch and permutation support
