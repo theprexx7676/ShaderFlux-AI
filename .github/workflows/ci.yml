@@ -102,3 +102,35 @@ jobs:
           assert len(everything) > len(collision), (len(everything), len(collision))
           print("clean:", len(clean), "collision:", len(collision), "all:", len(everything))
           PY
+
+  # DXC is not in the Ubuntu archive, so download Microsoft's release. This is the only place the
+  # HLSL path is exercised against a real DXC; it also records facts about DXC for the docs.
+  dxc-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install the other shader tools
+        run: sudo apt-get update && sudo apt-get install -y spirv-tools glslang-tools spirv-cross glslc
+      - name: Install DXC from its GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/dxc"
+          gh release download --repo microsoft/DirectXShaderCompiler \
+            --pattern 'linux_dxc_*.tar.gz' --dir "$RUNNER_TEMP/dxc"
+          ls -la "$RUNNER_TEMP/dxc"
+          tar -xzf "$RUNNER_TEMP"/dxc/linux_dxc_*.tar.gz -C "$RUNNER_TEMP/dxc"
+          find "$RUNNER_TEMP/dxc" -maxdepth 2 -not -name '*.tar.gz' | head -30
+          echo "$RUNNER_TEMP/dxc/bin" >> "$GITHUB_PATH"
+          echo "LD_LIBRARY_PATH=$RUNNER_TEMP/dxc/lib:${LD_LIBRARY_PATH:-}" >> "$GITHUB_ENV"
+      - run: dxc --version
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+      - run: uv pip install -e ".[dev]"
+      - name: What shaderflux sees
+        run: python -m shaderflux doctor --json
+      - name: Facts about DXC (not a test; read when updating the docs)
+        run: python scripts/dxc_experiments.py
+      - name: Tests against the real DXC
+        run: python -m pytest -m "needs_tools and not needs_llm and not needs_gpu" -rs -v tests/integration/test_dxc.py tests/integration/test_translate_e2e.py

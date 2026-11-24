@@ -54,3 +54,69 @@ def test_binding_shift_flags_are_accepted_by_real_dxc(corpus: Path) -> None:
         source(corpus, "textured.hlsl"), target=SPIRV
     )
     assert result.ok, result.diagnostics
+
+
+# ---- claims that `shaderflux lint` makes about DXC, checked against the real thing -------------
+
+
+def _slots(spirv: bytes) -> dict[tuple[int, int], list[str]]:
+    from shaderflux.analysis.reflection import reflect
+    from shaderflux.tools.spirv_cross import SpirvCrossBackend
+
+    reflection = reflect(spirv, SpirvCrossBackend.discover())
+    return {slot: [r.name for r in found] for slot, found in reflection.by_slot().items()}
+
+
+def test_default_mapping_collides_and_the_proposed_flags_fix_it(corpus: Path) -> None:
+    """BND001: DXC ignores the register type, and the flags we print really separate them."""
+    from shaderflux.analysis.bindings import parse_hlsl_bindings, propose_policy
+
+    require_tool("dxc", "spirv-cross")
+    shader = corpus / "hlsl" / "collision.hlsl"
+    text = shader.read_text()
+    source = ShaderSource(
+        path=shader, text=text, language=ShaderLanguage.HLSL, stage=ShaderStage.FRAGMENT
+    )
+
+    default = DxcBackend.discover().compile(source, target=SPIRV)
+    assert default.ok, default.diagnostics
+    assert default.output is not None
+    crowded = {slot: names for slot, names in _slots(default.output).items() if len(names) > 1}
+    assert crowded, "expected DXC to put several resources on one binding by default"
+    assert (0, 0) in crowded
+
+    plan = propose_policy(parse_hlsl_bindings(text))
+    assert plan.policy is not None
+    fixed = DxcBackend.discover(binding_policy=plan.policy).compile(source, target=SPIRV)
+    assert fixed.ok, fixed.diagnostics
+    assert fixed.output is not None
+    assert all(len(names) == 1 for names in _slots(fixed.output).values()), _slots(fixed.output)
+
+
+def test_hlsl_translates_to_glsl_with_every_real_tool(corpus: Path) -> None:
+    from shaderflux.pipeline.translate import TranslateOptions, translate
+    from shaderflux.source.inputs import load_source
+    from shaderflux.tools.base import CrossOptions
+    from shaderflux.tools.registry import default_registry
+
+    require_tool("dxc", "spirv-cross", "spirv-val", "glslangValidator")
+    result = translate(
+        load_source(corpus / "hlsl" / "textured.hlsl", stage=ShaderStage.FRAGMENT),
+        Target(language=ShaderLanguage.GLSL, version="450"),
+        registry=default_registry(),
+        options=TranslateOptions(cross=CrossOptions(vulkan_semantics=True)),
+    )
+    assert result.ok, [d.format() for d in result.diagnostics]
+    assert "void main()" in (result.output_text or "")
+    assert result.stages[0].name == "includes"
+    assert any(s.name == "compile hlsl" and s.tool and s.tool.name == "dxc" for s in result.stages)
+
+
+def test_dxc_is_found_and_its_version_is_parsed() -> None:
+    from shaderflux.tools.discovery import ToolState, doctor
+
+    require_tool("dxc")
+    report = doctor(keys=["dxc"])
+    (status,) = report.tools
+    assert status.state is ToolState.OK, status
+    assert status.version, "the version regex did not match `dxc --version`"
