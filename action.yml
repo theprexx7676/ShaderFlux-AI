@@ -13,7 +13,7 @@ inputs:
     description: Fail the job at this severity or above (error, warning, note, never).
     default: error
   target:
-    description: Porting target. "vulkan" enables the Vulkan binding rules; "any" skips them.
+    description: Porting target. "vulkan" enables the Vulkan-specific rules (HLSL binding collisions and GLSL that Vulkan rejects); "any" skips them, for example for GLSL that stays on OpenGL.
     default: vulkan
   sarif-file:
     description: Where to write the SARIF report.

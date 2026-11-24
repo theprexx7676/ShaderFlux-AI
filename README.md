@@ -172,6 +172,7 @@ If the optional LLM is used, it never has the last word: a fix is kept only if t
 | Translation between HLSL, GLSL, SPIR-V and MSL | GLSL input works and is tested with real tools. HLSL input works against DXC 1.9 on Linux in CI; other DXC versions and Windows are untested. MSL output is implemented but untested |
 | Binding collision check and fix flags | Works; the printed DXC flags are confirmed against DXC 1.9 in CI |
 | Matrix-convention and intrinsic checks | Work; heuristic, each finding has a confidence level |
+| GLSL-to-Vulkan checks (`VKG001`-`VKG004`) | Work; agree with glslangValidator 15.1.0 on a 26-snippet table. Skip them with `--target any` if your GLSL stays on OpenGL |
 | `explain` for every rule | Works |
 | Output re-check and run reports | Work for GLSL output; HLSL output is re-checked only if DXC is installed |
 | `fix`: binding attributes and matrix layout (HLSL) | Works, no AI; unit-tested, re-linted, and confirmed against DXC 1.9 on Linux in CI (other DXC versions and Windows untested) |
@@ -247,6 +248,8 @@ Run the lint on every pull request that touches shaders, and see the findings in
     fail-on: error          # error | warning | note | never
     upload-sarif: "true"    # needs `security-events: write`
 ```
+
+The default `target` is `vulkan`, which also enables the checks for GLSL that Vulkan rejects; set `target: any` for shaders that stay on OpenGL.
 
 A complete workflow is in [examples/workflows/lint-shaders.yml](examples/workflows/lint-shaders.yml). The script behind the Action (`scripts/action-lint.sh`) is covered by tests, including inputs that try to inject shell commands. CI runs the Action on this repository's own shaders on every pull request: a clean shader passes, a binding collision fails the job, globs expand, and the SARIF is checked. The **upload to code scanning has not been exercised** (it needs repository permissions), and the pinned `upload-sarif@v3` should be checked against the current major version.
 
