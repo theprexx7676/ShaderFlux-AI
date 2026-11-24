@@ -23,6 +23,21 @@ Translating shaders between platforms is slow and error-prone. The mechanical pa
 
 ShaderFlux-AI automates the mechanical steps, uses the LLM for the judgment calls, and **checks every result with real compilers and validators** before calling it done.
 
+## What you get
+
+**The end result:** one command-line tool, `shaderflux`, that takes a shader and gives you back a PC-ready version plus a report you can trust.
+
+1. **A translated shader.** HLSL, GLSL or SPIR-V in; HLSL, GLSL, SPIR-V or MSL out, produced by the standard compiler tools rather than guessed.
+2. **A verdict.** Each result says how far it was checked: compiled, validated as SPIR-V, same resources as the original, and (optionally) same pixels. Nothing is called "verified" unless the checks ran.
+3. **A list of porting risks.** Before you ship, it flags the classic traps: resource bindings that collide, matrices that may be transposed, `mul` written two different ways, intrinsics that behave differently between APIs.
+4. **Plain-language fixes.** When the tools fail or something looks wrong, the LLM proposes a small, reviewable change and explains why, instead of leaving you with a wall of compiler errors.
+
+**How it helps people:**
+- *Small teams and solo developers* get the same tool-chain knowledge that big studios keep in-house, without having to learn every compiler flag.
+- *People learning graphics programming* see exactly what changed between APIs and why.
+- *Anyone porting a project* spends less time on the repetitive 80% (conversion, bindings, validation) and more on the 20% that needs human judgment.
+- *Everyone* can trust the output more, because it is checked by real compilers and every change is a diff you can read.
+
 ## How it works
 
 ```
