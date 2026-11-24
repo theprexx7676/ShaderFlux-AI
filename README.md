@@ -88,6 +88,8 @@ void frag_main()
 }
 ```
 
+If DXC is not installed you will also see `warning: dxc was not found, so the generated HLSL was not recompiled` on stderr: the output is then not re-checked, and the tool says so.
+
 Note `row_major`: the GLSL matrix was column-major, and the translation flips the qualifier so the memory layout stays identical. This is exactly the kind of detail that silently breaks ports when done by hand.
 
 Errors are reported with file and line, and a non-zero exit code:
@@ -95,8 +97,11 @@ Errors are reported with file and line, and a non-zero exit code:
 ```text
 $ shaderflux translate broken.frag --to hlsl
 broken.frag:3: error: 'undefined_thing' : undeclared identifier
+broken.frag:3: error: '' : compilation terminated
 translation failed
 ```
+
+(The second line is glslang's own follow-up message.)
 
 ## Find porting bugs before they bite
 
