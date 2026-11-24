@@ -84,6 +84,7 @@ Input: a constant buffer with `float4x4 plain;`, `row_major float4x4 rowm;`,
 
 Also checked with the same DXC (all passing in `tests/integration/test_dxc.py`):
 
+- `#pragma pack_matrix(row_major)` switches unqualified matrices to `row_major`, as rule `MAT002` suggests (offsets unchanged);
 - the binding collision of `BND001` is real: by default `Params`, `albedo`, `samp` and `output` all land on set 0, binding 0;
 - the flags that `shaderflux lint` prints (`-fvk-s-shift 3 all -fvk-t-shift 1 all -fvk-u-shift 4 all`) put them on bindings 0, 1, 2, 3 and 4;
 - the HLSL that SPIRV-Cross generates (Shader Model 5) is accepted by DXC both as SPIR-V and as DXIL.
@@ -93,7 +94,6 @@ A bug this found: without `--shader-model`, SPIRV-Cross writes Shader Model 3 HL
 
 ## Still not verified
 
-- Whether `#pragma pack_matrix(row_major)` behaves like `-Zpr` (a test for it is in `tests/integration/test_dxc.py`; read its result in CI before relying on it).
 - Options such as `-fvk-use-gl-layout` and `-fvk-use-dx-layout`.
 - Other DXC versions, and the Windows build of DXC (the one most developers have). Only the Linux 1.9 release was exercised.
 

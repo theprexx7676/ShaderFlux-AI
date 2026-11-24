@@ -90,8 +90,8 @@ _BASE: tuple[RuleInfo, ...] = (
         "Write row_major or column_major on the matrix (or use #pragma pack_matrix) so the layout "
         "is stated in the source.",
         "Verified with real tools: SPIRV-Cross flips the qualifier between GLSL and HLSL, and with "
-        "DXC 1.9 an unqualified matrix is packed like column_major while -Zpr makes it row_major "
-        "(docs/matrix-conventions.md).",
+        "DXC 1.9 an unqualified matrix is packed like column_major while -Zpr or "
+        "#pragma pack_matrix(row_major) makes it row_major (docs/matrix-conventions.md).",
         (_SLANG_MATRIX,),
     ),
     RuleInfo(
