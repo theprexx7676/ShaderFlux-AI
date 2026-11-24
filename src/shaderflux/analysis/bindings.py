@@ -20,7 +20,7 @@ from pydantic import BaseModel, Field
 from shaderflux.analysis.findings import Confidence, Finding
 from shaderflux.core.models import Severity
 from shaderflux.core.text import LineIndex
-from shaderflux.pipeline.includes import mask_comments
+from shaderflux.source.includes import mask_comments
 from shaderflux.tools.dxc import BindingPolicy
 
 RegType = Literal["b", "t", "s", "u"]

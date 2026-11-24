@@ -18,7 +18,7 @@ from dataclasses import dataclass
 from shaderflux.analysis.findings import Confidence, Finding
 from shaderflux.core.models import Severity, ShaderLanguage
 from shaderflux.core.text import LineIndex
-from shaderflux.pipeline.includes import mask_comments
+from shaderflux.source.includes import mask_comments
 
 _HLSL_MATRIX_DECL = re.compile(
     r"\b(?:(?P<layout>row_major|column_major)\s+)?"

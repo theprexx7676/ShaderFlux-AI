@@ -16,7 +16,7 @@ from pathlib import Path
 from shaderflux.core.errors import InvalidInputError
 from shaderflux.core.models import Diagnostic, Severity
 from shaderflux.core.text import LineIndex
-from shaderflux.pipeline.inputs import decode_text
+from shaderflux.source.inputs import decode_text
 
 _INCLUDE = re.compile(r'^[ \t]*#[ \t]*include[ \t]*(?P<open>["<])(?P<name>[^">\n]+)[">]', re.M)
 

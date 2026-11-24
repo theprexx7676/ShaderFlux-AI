@@ -8,7 +8,7 @@ import pytest
 
 from shaderflux.core.errors import InvalidInputError
 from shaderflux.core.models import ShaderLanguage, ShaderStage
-from shaderflux.pipeline.inputs import (
+from shaderflux.source.inputs import (
     decode_text,
     detect_language,
     detect_stage,

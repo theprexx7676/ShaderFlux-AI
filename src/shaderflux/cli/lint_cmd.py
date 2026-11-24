@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import glob
 from enum import StrEnum
 from pathlib import Path
 
@@ -16,9 +15,9 @@ from shaderflux.analysis.lint import LintReport, filter_findings, lint_file, to_
 from shaderflux.analysis.rules import all_rules, get_rule
 from shaderflux.cli.errors import EXIT_FAILED, EXIT_OK, EXIT_USAGE, handle_errors
 from shaderflux.core.config import load_settings
-from shaderflux.core.errors import InvalidInputError
 from shaderflux.core.models import Severity
-from shaderflux.pipeline.inputs import parse_language_name
+from shaderflux.source.inputs import parse_language_name
+from shaderflux.source.patterns import expand_patterns
 
 
 class FailOn(StrEnum):
@@ -56,34 +55,6 @@ def _summary(report: LintReport, findings: list[Finding]) -> str:
     counts = {s: sum(1 for f in findings if f.severity is s) for s in Severity}
     parts = [f"{n} {s.value}{'s' if n != 1 else ''}" for s, n in counts.items() if n]
     return ", ".join(parts) if parts else "no problems"
-
-
-_GLOB_MAGIC = ("*", "?", "[")
-
-
-def expand_patterns(arguments: list[Path]) -> list[Path]:
-    """Expand glob patterns (including ``**``) in the given arguments.
-
-    Shells differ: Windows shells do not expand globs at all and bash 3.2 (the macOS
-    default) has no ``**``. Doing it here makes every platform behave the same.
-    A name that exists is taken literally; a plain missing name is passed through so
-    the usual "no such file" error is reported; a pattern that matches nothing is an error.
-    """
-    expanded: list[Path] = []
-    seen: set[Path] = set()
-    for argument in arguments:
-        text = str(argument)
-        if argument.exists() or not any(ch in text for ch in _GLOB_MAGIC):
-            matches = [argument]
-        else:
-            matches = sorted(Path(m) for m in glob.glob(text, recursive=True) if Path(m).is_file())
-            if not matches:
-                raise InvalidInputError(f"no shader files matched: {text}")
-        for match in matches:
-            if match not in seen:
-                seen.add(match)
-                expanded.append(match)
-    return expanded
 
 
 @handle_errors

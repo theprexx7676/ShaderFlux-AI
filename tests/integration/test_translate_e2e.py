@@ -7,8 +7,8 @@ from pathlib import Path
 import pytest
 
 from shaderflux.core.models import ShaderLanguage, Target
-from shaderflux.pipeline.inputs import load_source
 from shaderflux.pipeline.translate import TranslateOptions, translate
+from shaderflux.source.inputs import load_source
 from shaderflux.tools.base import CrossOptions
 from shaderflux.tools.registry import default_registry
 from tests.conftest import require_tool

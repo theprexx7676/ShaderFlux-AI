@@ -221,7 +221,7 @@ def test_explain_lists_and_details_rules() -> None:
 
 
 def test_expand_patterns_handles_recursive_globs_literals_and_duplicates(tmp_path: Path) -> None:
-    from shaderflux.cli.lint_cmd import expand_patterns
+    from shaderflux.source.patterns import expand_patterns
 
     (tmp_path / "a" / "b").mkdir(parents=True)
     first, second = tmp_path / "a" / "one.hlsl", tmp_path / "a" / "b" / "two.hlsl"
@@ -238,7 +238,7 @@ def test_expand_patterns_handles_recursive_globs_literals_and_duplicates(tmp_pat
 
 
 def test_expand_patterns_reports_a_pattern_that_matches_nothing(tmp_path: Path) -> None:
-    from shaderflux.cli.lint_cmd import expand_patterns
+    from shaderflux.source.patterns import expand_patterns
 
     with pytest.raises(InvalidInputError, match="no shader files matched"):
         expand_patterns([Path(str(tmp_path / "*.hlsl"))])

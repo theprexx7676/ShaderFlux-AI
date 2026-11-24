@@ -26,10 +26,10 @@ from shaderflux.llm.repair import (
 )
 from shaderflux.llm.schemas import PATCH_SCHEMA
 from shaderflux.pipeline.cache import TranslationCache
-from shaderflux.pipeline.inputs import load_source, parse_language_name, parse_stage_name
 from shaderflux.pipeline.output import write_output
 from shaderflux.pipeline.translate import TranslateOptions, translate
 from shaderflux.reporting.report import build_report, write_report
+from shaderflux.source.inputs import load_source, parse_language_name, parse_stage_name
 from shaderflux.tools.base import CrossOptions
 from shaderflux.tools.registry import default_registry
 

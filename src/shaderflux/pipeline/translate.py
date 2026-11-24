@@ -19,8 +19,8 @@ from shaderflux.core.models import (
     TranslationResult,
 )
 from shaderflux.pipeline.cache import TranslationCache, make_key
-from shaderflux.pipeline.includes import build_include_graph
 from shaderflux.pipeline.routes import HopKind, plan_route
+from shaderflux.source.includes import build_include_graph
 from shaderflux.tools.base import BackendRegistry, CrossOptions, ToolResult
 from shaderflux.verify.recompile import recheck_generated
 

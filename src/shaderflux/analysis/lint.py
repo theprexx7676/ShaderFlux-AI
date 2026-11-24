@@ -20,8 +20,8 @@ from shaderflux.analysis.limits import exceeds_limits, skipped_finding
 from shaderflux.analysis.matrix_rules import check_matrices
 from shaderflux.core.errors import InvalidInputError
 from shaderflux.core.models import Severity, ShaderLanguage
-from shaderflux.pipeline.includes import build_include_graph
-from shaderflux.pipeline.inputs import decode_text, detect_language
+from shaderflux.source.includes import build_include_graph
+from shaderflux.source.inputs import decode_text, detect_language
 
 _SEVERITY_RANK = {Severity.NOTE: 0, Severity.WARNING: 1, Severity.ERROR: 2}
 

@@ -8,7 +8,7 @@ import pytest
 
 from shaderflux.core.errors import InvalidInputError
 from shaderflux.core.models import Severity
-from shaderflux.pipeline.includes import build_include_graph, flatten, mask_comments
+from shaderflux.source.includes import build_include_graph, flatten, mask_comments
 
 pytestmark = pytest.mark.unit
 

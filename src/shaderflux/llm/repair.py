@@ -18,9 +18,9 @@ from shaderflux.llm.patches import PatchError, apply_patch
 from shaderflux.llm.prompts_loader import prompt_version
 from shaderflux.llm.provider import LlmProvider, LlmRequest, UsageTotals
 from shaderflux.llm.schemas import PATCH_SCHEMA, PatchProposal, parse_proposal
-from shaderflux.pipeline.includes import build_include_graph
-from shaderflux.pipeline.inputs import decode_text
 from shaderflux.pipeline.translate import TranslateOptions, translate
+from shaderflux.source.includes import build_include_graph
+from shaderflux.source.inputs import decode_text
 from shaderflux.tools.base import BackendRegistry
 
 
