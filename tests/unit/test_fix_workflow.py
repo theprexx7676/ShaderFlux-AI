@@ -311,3 +311,52 @@ def test_a_failed_reflection_keeps_the_fact_that_it_compiled(tmp_path: Path, cor
     assert outcome.verification is not None
     assert outcome.verification.status is VerifyStatus.OK
     assert "bindings not checked" in outcome.verification.detail
+
+
+# ----------------------------------------------------------------------------- several files
+
+
+def _tree(tmp_path: Path, corpus: Path) -> Path:
+    (tmp_path / "shaders" / "sub").mkdir(parents=True)
+    shutil.copy(corpus / "hlsl" / "collision.hlsl", tmp_path / "shaders" / "a.hlsl")
+    shutil.copy(corpus / "lint" / "pbr_clean.hlsl", tmp_path / "shaders" / "sub" / "b.hlsl")
+    return tmp_path
+
+
+def test_cli_check_walks_a_glob_and_fails_if_any_file_needs_fixing(
+    tmp_path: Path, corpus: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.chdir(_tree(tmp_path, corpus))
+    result = runner.invoke(app, ["fix", "--check", "shaders/**/*.hlsl"])
+    assert result.exit_code == 1
+    assert "a.hlsl" in result.output
+    assert "b.hlsl" in result.output  # every file is reported, not just the first
+
+
+def test_cli_write_fixes_every_file_and_then_check_passes(
+    tmp_path: Path, corpus: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.chdir(_tree(tmp_path, corpus))
+    assert runner.invoke(app, ["fix", "--write", "shaders/**/*.hlsl"]).exit_code == 0
+    assert "[[vk::binding(" in (tmp_path / "shaders" / "a.hlsl").read_text()
+    assert runner.invoke(app, ["fix", "--check", "shaders/**/*.hlsl"]).exit_code == 0
+
+
+def test_cli_out_needs_a_single_input(
+    tmp_path: Path, corpus: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.chdir(_tree(tmp_path, corpus))
+    result = runner.invoke(app, ["fix", "--out", "x.hlsl", "shaders/**/*.hlsl"])
+    assert result.exit_code == 2
+    assert not (tmp_path / "x.hlsl").exists()
+
+
+def test_cli_one_unreadable_file_does_not_stop_the_others(
+    tmp_path: Path, corpus: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.chdir(_tree(tmp_path, corpus))
+    (tmp_path / "shaders" / "binary.hlsl").write_bytes(b"\x00\x01\x02")
+    result = runner.invoke(app, ["fix", "--check", "shaders/**/*.hlsl"])
+    assert result.exit_code == 2  # the worst outcome wins
+    assert "a.hlsl" in result.output
+    assert "binary file" in result.output

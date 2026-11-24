@@ -56,7 +56,7 @@ The code is a one-way stack. A package may import only the packages listed for i
 | `pipeline` | Route planning, cache, `translate`, atomic output | `core`, `source`, `tools`, `verify` |
 | `llm` | Provider interface, Anthropic provider, prompts, patches, repair loop; **the only code that talks to the API** (`anthropic_provider.py`) | `core`, `source`, `tools`, `pipeline` |
 | `reporting` | Report model and renderers | `core`, `analysis`, `llm`, `verify` |
-| `workflows` | `translate_file`: option checks, translate or repair, writing outputs and reports; `fix_file`: deterministic fixes (`analysis/autofix.py`), no AI | everything below |
+| `workflows` | `translate_file`: option checks, translate or repair, writing outputs and reports; `fix_file`: deterministic fixes (`analysis/autofix.py`), no AI; `init_project`: starter files | everything below |
 | `cli` | Typer commands; **the only code that prints or uses Typer and Rich** | everything below |
 | `api.py` | The public Python API (re-exports) | the library layers, never `cli` |
 

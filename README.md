@@ -107,6 +107,8 @@ $ shaderflux fix collision.hlsl
 dry run: nothing was changed (use --write or --out)
 ```
 
+New here? Follow the [10-minute tutorial](docs/tutorial-first-port.md): find the traps, fix them, check the result.
+
 `fix` only **inserts** text (it never deletes or rewrites your code), shows a diff by default, and changes nothing until you pass `--write` (in place) or `--out FILE`. `--check` exits 1 if fixes are pending, which suits CI. It is deterministic: the same input always gives the same output, with no model, key or network. It fixes `BND001` and `MAT002` in HLSL only, skips anything it cannot place safely (and says why), and re-lints the result. `BND001` is not fixed for shaders that `#include` other files, because bindings are decided across all files. The `[[vk::binding]]` attributes give the same bindings as the `-fvk-*-shift` flags that `lint` prints; D3D builds keep using the `register(...)`. `--verify` recompiles the fixed shader with DXC and checks that no two resources share a binding; it refuses to write a fix that stops a compiling shader from compiling, and says "not verified" (exit 2) when DXC or the shader stage is missing. Tests that need a real DXC (CI job `dxc-tests`) cover both.
 
 ## What you get
@@ -204,6 +206,7 @@ shaderflux fix lighting.hlsl
 shaderflux fix lighting.hlsl --write
 shaderflux fix lighting.hlsl --out lighting.vk.hlsl --only BND001
 shaderflux fix lighting.hlsl --check          # exit 1 if there is something to fix (for CI)
+shaderflux fix 'shaders/**/*.hlsl' --check    # several files and globs work
 shaderflux fix lighting.hlsl --verify -s fragment   # also recompile the fixed shader with DXC
 
 # Write a report of what was done and what was and was not checked
@@ -211,6 +214,9 @@ shaderflux translate lighting.frag --to hlsl --report report.md
 
 # Show the effective configuration and where each value comes from
 shaderflux config show
+
+# Write a starter shaderflux.toml (and, with --github, a workflow that lints shaders on PRs)
+shaderflux init . --github
 ```
 
 Exit codes: `0` success, `1` the translation failed (for example a compile error), `2` bad input or a missing tool, `3` a tool failed while running.

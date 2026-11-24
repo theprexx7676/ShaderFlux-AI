@@ -49,6 +49,7 @@ from shaderflux.workflows.fix_file import (
     VerifyStatus,
     run_fix,
 )
+from shaderflux.workflows.init_project import InitOutcome, InitRequest, run_init
 from shaderflux.workflows.translate_file import (
     TranslateOutcome,
     TranslateRequest,
@@ -64,6 +65,8 @@ __all__ = [
     "Finding",
     "FixOutcome",
     "FixRequest",
+    "InitOutcome",
+    "InitRequest",
     "InvalidInputError",
     "LintReport",
     "LlmError",
@@ -94,5 +97,6 @@ __all__ = [
     "lint_text",
     "render_markdown",
     "run_fix",
+    "run_init",
     "run_translate",
 ]
