@@ -196,6 +196,21 @@ The model only proposes line edits. The tool rejects stale or oversized edits, n
 
 Planned, not built yet: `shaderflux fix` from a compiler log.
 
+## Use it in GitHub Actions
+
+Run the lint on every pull request that touches shaders, and see the findings in GitHub's code-scanning tab:
+
+```yaml
+- uses: actions/checkout@v4
+- uses: theprexx7676/ShaderFlux-AI@main   # pin a release tag or commit once there is one
+  with:
+    paths: "shaders/**/*.hlsl shaders/**/*.glsl"
+    fail-on: error          # error | warning | note | never
+    upload-sarif: "true"    # needs `security-events: write`
+```
+
+A complete workflow is in [examples/workflows/lint-shaders.yml](examples/workflows/lint-shaders.yml). The script behind the Action (`scripts/action-lint.sh`) is covered by tests, including inputs that try to inject shell commands. The Action itself **has not been run on GitHub yet**, and the pinned `upload-sarif@v3` should be checked against the current major version.
+
 ## Requirements
 
 - Python 3.11 or newer.
