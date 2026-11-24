@@ -93,6 +93,29 @@ def test_default_mapping_collides_and_the_proposed_flags_fix_it(corpus: Path) ->
     assert all(len(names) == 1 for names in _slots(fixed.output).values()), _slots(fixed.output)
 
 
+def test_the_fix_command_output_compiles_to_distinct_slots_without_any_flags(
+    corpus: Path,
+) -> None:
+    """`shaderflux fix` puts the proposed bindings in the source: DXC needs no -fvk flags then."""
+    from shaderflux.analysis.autofix import apply_edits, plan_fixes
+
+    require_tool("dxc", "spirv-cross")
+    original = (corpus / "hlsl" / "collision.hlsl").read_text()
+    fixed_text = apply_edits(original, plan_fixes(original).edits)
+    fixed = ShaderSource(
+        path=corpus / "hlsl" / "collision.hlsl",
+        text=fixed_text,
+        language=ShaderLanguage.HLSL,
+        stage=ShaderStage.FRAGMENT,
+    )
+    result = DxcBackend.discover().compile(fixed, target=SPIRV)  # default policy: no shifts
+    assert result.ok, result.diagnostics
+    assert result.output is not None
+    slots = _slots(result.output)
+    assert all(len(names) == 1 for names in slots.values()), slots
+    assert len(slots) == 5, slots  # b0 t0 t1 s0 u0
+
+
 def test_hlsl_translates_to_glsl_with_every_real_tool(corpus: Path) -> None:
     from shaderflux.pipeline.translate import TranslateOptions, translate
     from shaderflux.source.inputs import load_source

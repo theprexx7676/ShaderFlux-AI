@@ -1,6 +1,6 @@
 # ShaderFlux-AI: Detailed Work Plan
 
-Status: **in progress** (v0.0.1, unreleased). Built and tested: phases 1 to 4 (foundation, tool layer, pipeline, analysis and `lint`), the core of phases 5 and 6 (LLM repair, tested only with a scripted model), output re-check and reports (phase 7/8, partly), and a GitHub Action. **Never run against the real thing:** the DXC backend (no `dxc` available), the live Claude API (no key), and the GitHub Action (no run on GitHub). Not built: reflection and image comparison, batch mode and permutations, a `fix` command, benchmarks, release. Checked boxes (`[x]`) mean done and tested; notes in italics say what is partial or unverified.
+Status: **in progress** (v0.0.1, unreleased). Built and tested: phases 1 to 4 (foundation, tool layer, pipeline, analysis and `lint`), a deterministic `shaderflux fix` (BND001, MAT002; no AI), the core of phases 5 and 6 (optional LLM repair, tested only with a scripted model), output re-check and reports (phase 7/8, partly), and a GitHub Action. **Direction:** the project must be fully useful without any API key; the LLM is optional, experimental and uses the user's own key. **Never run against the real thing:** the live Claude API (no key), the SARIF upload step of the Action, Windows DXC and other DXC versions (DXC 1.9 on Linux runs in CI). Not built: image comparison, batch mode and permutations, fixes for other rules, benchmarks, release. Checked boxes (`[x]`) mean done and tested; notes in italics say what is partial or unverified.
 
 How to read this document:
 - Phases are ordered by dependency. Each task has micro-steps as checkboxes and an **Acceptance** line that says when it is done.
@@ -16,7 +16,7 @@ How to read this document:
 An open-source assistant that helps developers port shaders to PC. A deterministic compiler chain does the mechanical work. An LLM handles judgment calls. Real compilers and validators verify every result.
 
 ### 0.1b Product direction (updated)
-The tool should solve problems people already search for and fail to find answered, and be pleasant to use. In practice that means: **lint-first** (`shaderflux lint` and `shaderflux explain` are the front door, translation is the second step); every message names a concrete fix; output works for people (colour, short text) and for machines (JSON, SARIF for GitHub code scanning); and every claim is backed by evidence recorded in `docs/pain-points.md` or `docs/matrix-conventions.md`. Planned additions that follow from this: a GitHub Action running `lint` on pull requests, an `init` command that writes a starter config, a `--fix-bindings` option that applies the proposed binding flags, and a short guided `shaderflux port` flow.
+The tool should solve problems people already search for and fail to find answered, and be pleasant to use. In practice that means: **lint-first** (`shaderflux lint` and `shaderflux explain` are the front door, translation is the second step); every message names a concrete fix; output works for people (colour, short text) and for machines (JSON, SARIF for GitHub code scanning); and every claim is backed by evidence recorded in `docs/pain-points.md` or `docs/matrix-conventions.md`. Planned additions that follow from this: a GitHub Action running `lint` on pull requests, an `init` command that writes a starter config, a short guided `shaderflux port` flow.
 
 ### 0.2 Principles
 1. **Tools first, LLM second.** Never ask the LLM to do what DXC, SPIRV-Cross or a lint rule can do exactly.
@@ -425,7 +425,7 @@ Each task is a prompt + a verifier.
 
 ### 6.4 `translate` with repair (milestone M3)
 - [x] 6.4.1 `shaderflux translate` runs the deterministic path first and uses the repair loop only on failure or lint findings the user opted into.
-- [ ] 6.4.2 `shaderflux fix file --log compiler.log` starts from a user-supplied log, for people who already ran their own compiler. *(Not done: no `fix` command yet.)*
+- [ ] 6.4.2 Start the optional repair from a user-supplied compiler log. *(Not done; `shaderflux fix` is the deterministic, no-AI command and does not take a log.)*
 - [ ] 6.4.3 Both commands end with a report (Phase 8). *(Not done: reports are phase 8.)*
 - **Acceptance:** at least 70% of the "needs repair" corpus cases converge with the real model (target to be revisited after the first measurement, see Phase 10).
 
@@ -478,7 +478,7 @@ Goal: back every claim of success with evidence.
 
 ### 8.1 Commands
 - [ ] 8.1.1 `translate`: inputs, `--from`, `--to`, `--stage`, `--entry`, `-D`, `-I`, `--out`, `--force`, `--llm/--no-llm`, `--max-attempts`, `--verify-level`, `--report`.
-- [ ] 8.1.2 `fix`: shader + log.
+- [x] 8.1.2 `fix`: deterministic fixes for BND001 and MAT002 (insertions only; dry run by default; `--write`, `--out`, `--only`, `--check`). *(Changed from "shader + log": no AI needed. Not done: other rules, a `--verify` compile with DXC; the real-DXC test runs in CI only.)*
 - [ ] 8.1.3 `lint`: see 4.6.
 - [ ] 8.1.4 `explain`: show the report for a previous run in plain language.
 - [ ] 8.1.5 `doctor`: see 2.3.

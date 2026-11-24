@@ -65,6 +65,7 @@ class HlslBinding(BaseModel):
     number: int | None = None
     space: int = 0
     line: int = 1
+    offset: int = 0  # character offset of the declared name in the source text
     vk_binding: int | None = None
     vk_set: int | None = None
 
@@ -125,6 +126,7 @@ def parse_hlsl_bindings(text: str, *, file: str | None = None) -> list[HlslBindi
             number=int(match.group("num")),
             space=int(match.group("space") or 0),
             line=line_of(match.start()),
+            offset=match.start(),
         )
 
     for match in _VK_BINDING.finditer(masked):

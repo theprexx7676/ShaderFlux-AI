@@ -99,7 +99,10 @@ def translate_command(
     cache: bool = typer.Option(False, "--cache", help="Reuse results of identical runs."),
     json_output: bool = typer.Option(False, "--json", help="Print the full result as JSON."),
     repair: bool = typer.Option(
-        False, "--repair", help="If it fails to compile, ask Claude for fixes (sends your shader)."
+        False,
+        "--repair",
+        help="Experimental, optional: if it fails to compile, ask Claude for fixes. "
+        "Needs your own ANTHROPIC_API_KEY and sends your shader.",
     ),
     dry_run: bool = typer.Option(
         False, "--dry-run", help="With --repair: show exactly what would be sent; send nothing."

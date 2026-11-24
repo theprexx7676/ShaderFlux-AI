@@ -14,8 +14,8 @@ result.
  2. Convert   deterministic tool chain (DXC / glslang -> SPIR-V -> SPIRV-Cross)
         |
         v
- 3. Repair    only with --repair and only if compilation fails: the LLM proposes small line
-        |     edits and the real compiler decides whether they worked
+ 3. Fix       `fix`: deterministic insertions (BND001, MAT002), no AI. Optional and experimental:
+        |     --repair, where an LLM proposes small line edits and the real compiler decides
         v
  4. Check     validate the SPIR-V, compile the generated GLSL/HLSL again
         |
@@ -56,7 +56,7 @@ The code is a one-way stack. A package may import only the packages listed for i
 | `pipeline` | Route planning, cache, `translate`, atomic output | `core`, `source`, `tools`, `verify` |
 | `llm` | Provider interface, Anthropic provider, prompts, patches, repair loop; **the only code that talks to the API** (`anthropic_provider.py`) | `core`, `source`, `tools`, `pipeline` |
 | `reporting` | Report model and renderers | `core`, `analysis`, `llm`, `verify` |
-| `workflows` | `translate_file`: option checks, translate or repair, writing outputs and reports | everything below |
+| `workflows` | `translate_file`: option checks, translate or repair, writing outputs and reports; `fix_file`: deterministic fixes (`analysis/autofix.py`), no AI | everything below |
 | `cli` | Typer commands; **the only code that prints or uses Typer and Rich** | everything below |
 | `api.py` | The public Python API (re-exports) | the library layers, never `cli` |
 
@@ -79,10 +79,10 @@ outcome = run_translate(
 
 ## Principles
 
-1. Tools first, LLM second.
+1. Tools first. The project must be fully useful with no API key, account or network; the LLM is an optional, experimental extra that uses the user's own key.
 2. Nothing is "checked" unless a real tool ran; reports say what was not checked.
 3. The LLM proposes small diffs, never unreviewed rewrites, and the compiler has the last word.
-4. Everything except `--repair` works offline.
+4. Everything except the optional `--repair` works offline.
 5. No shader leaves the machine unless the user asked for `--repair`.
 
 ## Adding things

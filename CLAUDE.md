@@ -2,7 +2,7 @@
 
 Open-source CLI that helps people port shaders to PC. A deterministic tool chain
 (DXC, SPIRV-Cross, SPIRV-Tools, glslang) does the mechanical work, lint rules find
-known porting traps, and an optional LLM (`translate --repair`, off by default) helps with the rest. Real tools verify
+known porting traps, `shaderflux fix` applies the mechanical fixes (no AI), and an optional, experimental LLM (`translate --repair`, off by default, user's own key) helps with the rest. **The project must stay fully useful with no API key**: never make a feature depend on the LLM, and never use a maintainer key. Real tools verify
 results. Plan: `docs/PLAN.md`. Evidence for the rules: `docs/pain-points.md` and
 `docs/matrix-conventions.md`.
 
@@ -78,4 +78,5 @@ Tool binaries live on `PATH` (apt: spirv-tools, glslang-tools, spirv-cross, glsl
   regression guard written by the same author, not independent evidence.
 - CI was green on pull request #1 at the last check (lint, unit tests on Ubuntu, macOS and Windows with Python 3.11 to 3.13). Always look at the latest run rather than trusting this line; it took three pushes to get green the first time, because CI found things local runs could not (see "Lessons"). Windows skips about 77 POSIX-only tests, so Windows coverage is thinner. An `integration-tests` job (Ubuntu only) installs the apt tools and runs the `needs_tools` tests without `dxc` (the DXC tests skip there); the `dxc-tests` job runs them with DXC. An `action-smoke` job runs `action.yml` itself on this repository's shaders (clean passes, collision fails, globs and SARIF checked); the `upload-sarif` step is skipped there and has never run.
 - The LLM layer (`llm/`, `translate --repair`) is tested only with a scripted fake model. It has **never run against the live API** (no key was available), so real prompt quality and success rates are unknown. The Anthropic request uses `output_config` (effort and JSON schema), no `thinking`/sampling parameters (current models reject them), and tries server-side refusal fallbacks first, retrying without them if rejected.
-- Verification beyond SPIR-V validation, reports, batch mode and the `fix` command are not built.
+- `fix` (`analysis/autofix.py`, `workflows/fix_file.py`) handles BND001 and MAT002 in HLSL only, by insertion; BND001 is withheld when the shader includes other files. Unit-tested; its real-DXC test (`test_the_fix_command_output_compiles_to_distinct_slots_without_any_flags`) runs only in the `dxc-tests` CI job, so check that run before calling it verified.
+- Verification beyond SPIR-V validation, reports, batch mode and image comparison are not built.

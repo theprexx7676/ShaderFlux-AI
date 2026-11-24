@@ -15,6 +15,7 @@ import time
 
 import pytest
 
+from shaderflux.analysis.autofix import apply_edits, plan_fixes
 from shaderflux.analysis.bindings import binding_findings, parse_hlsl_bindings, propose_policy
 from shaderflux.analysis.intrinsics import check_intrinsics
 from shaderflux.analysis.limits import MAX_LINE_CHARS, MAX_LINT_CHARS, exceeds_limits
@@ -68,6 +69,8 @@ def run_rules_directly(text: str, language: L) -> None:
         binding_findings(propose_policy(parse_hlsl_bindings(text)))
     check_matrices(text, language)
     check_intrinsics(text, language)
+    if language is L.HLSL:
+        apply_edits(text, plan_fixes(text).edits)
 
 
 class _Timeout(Exception):

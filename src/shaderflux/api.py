@@ -42,6 +42,7 @@ from shaderflux.core.models import (
 from shaderflux.reporting.report import Report, build_report, render_markdown
 from shaderflux.tools.discovery import DoctorReport, doctor
 from shaderflux.verify.levels import Assessment, assess
+from shaderflux.workflows.fix_file import FixOutcome, FixRequest, run_fix
 from shaderflux.workflows.translate_file import (
     TranslateOutcome,
     TranslateRequest,
@@ -55,6 +56,8 @@ __all__ = [
     "Diagnostic",
     "DoctorReport",
     "Finding",
+    "FixOutcome",
+    "FixRequest",
     "InvalidInputError",
     "LintReport",
     "LlmError",
@@ -82,5 +85,6 @@ __all__ = [
     "lint_file",
     "lint_text",
     "render_markdown",
+    "run_fix",
     "run_translate",
 ]

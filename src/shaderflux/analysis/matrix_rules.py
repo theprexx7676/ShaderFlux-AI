@@ -172,6 +172,28 @@ def _cbuffer_regions(text: str) -> list[tuple[int, int]]:
     return regions
 
 
+@dataclass(frozen=True)
+class MatrixSite:
+    """A constant-buffer matrix with no explicit layout (what rule MAT002 reports)."""
+
+    name: str
+    line: int
+    offset: int  # where the declaration starts, so a qualifier can be inserted there
+
+
+def unqualified_buffer_matrices(text: str) -> list[MatrixSite]:
+    """HLSL matrices in constant buffers with no row_major/column_major, unless a pragma sets it."""
+    masked = mask_comments(text)
+    if _PACK_PRAGMA.search(masked):
+        return []
+    regions = _cbuffer_regions(masked)
+    return [
+        MatrixSite(m.name, m.line, m.pos)
+        for m in _hlsl_matrices(masked)
+        if m.layout is None and any(lo <= m.pos < hi for lo, hi in regions)
+    ]
+
+
 def check_matrices(
     text: str, language: ShaderLanguage, *, file: str | None = None
 ) -> list[Finding]:
