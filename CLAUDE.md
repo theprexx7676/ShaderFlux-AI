@@ -20,11 +20,16 @@ Tool binaries live on `PATH` (apt: spirv-tools, glslang-tools, spirv-cross, glsl
 
 ## Layout
 
-`src/shaderflux/`: `cli` (Typer commands), `core` (models, config, errors),
-`tools` (the only code that spawns processes, via `tools/runner.py`), `pipeline`
-(includes, routes, cache, translate), `analysis` (reflection, bindings, lint
-rules), `llm` (provider, prompts, patches, repair loop), `verify` / `reporting` (still empty).
-Dependency direction: `cli -> pipeline -> analysis/tools -> core`.
+`src/shaderflux/` is a one-way stack, enforced by `tests/unit/test_architecture.py`
+(details and diagram: `docs/architecture.md`):
+
+`core` < `source`, `tools` < `verify`, `analysis` < `pipeline` < `llm` < `reporting` < `workflows` < `cli`
+
+- `tools` is the only code that spawns processes (`tools/runner.py`); `llm/anthropic_provider.py`
+  is the only code that talks to the API; only `cli` prints or imports Typer/Rich.
+- Logic goes in `workflows/` (data in, data out), not in `cli/`. `api.py` is the public Python API.
+- Adding a package, or an import that breaks the layering, fails the architecture test: update its
+  `ALLOWED` table and `docs/architecture.md` on purpose, not to make the test pass.
 
 ## Rules for working on this repo
 
@@ -63,6 +68,7 @@ Dependency direction: `cli -> pipeline -> analysis/tools -> core`.
 - Run a clean wheel install (`uv build --wheel`, install in a fresh venv) before claiming packaging works; editable installs hide missing package data.
 - Anything that costs money or time (an LLM call) must validate its output paths and option combinations **first**.
 - CI found what local runs could not. Shell scripts must work on **bash 3.2** (macOS default: no `globstar`, `mapfile`, `${x,,}`, `declare -A`); Windows shells expand no globs, so the CLI expands patterns itself (`expand_patterns`). CI runs tests **with coverage**, which can slow tight Python loops 25x, so timing tests assert how cost *scales* (`_assert_scales`), never an absolute time. Rich colours CLI `--help` on CI, so tests that read help text strip ANSI codes first.
+- Structure is checked by tests, not by memory: layering, one-place imports of `subprocess` and `anthropic`, UI libraries only in `cli`, no `print` in library code, and rule ids matching their documentation (`tests/unit/test_architecture.py`).
 - Child processes get a scrubbed environment (`tools/runner.py:clean_environment`); never pass secrets to tools.
 
 ## Known gaps (keep these honest in README and PLAN)

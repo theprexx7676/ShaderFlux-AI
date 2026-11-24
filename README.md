@@ -213,6 +213,24 @@ Run the lint on every pull request that touches shaders, and see the findings in
 
 A complete workflow is in [examples/workflows/lint-shaders.yml](examples/workflows/lint-shaders.yml). The script behind the Action (`scripts/action-lint.sh`) is covered by tests, including inputs that try to inject shell commands. CI runs the Action on this repository's own shaders on every pull request: a clean shader passes, a binding collision fails the job, globs expand, and the SARIF is checked. The **upload to code scanning has not been exercised** (it needs repository permissions), and the pinned `upload-sarif@v3` should be checked against the current major version.
 
+## Use it as a Python library
+
+Everything the command line does is available without it, through a small public API (it never prints and never imports the CLI):
+
+```python
+from pathlib import Path
+from shaderflux.api import ShaderLanguage, TranslateRequest, lint_file, run_translate
+
+for finding in lint_file("shaders/lighting.hlsl").findings:
+    print(finding.format())
+
+outcome = run_translate(
+    TranslateRequest(input_file=Path("pass.frag"), target_language=ShaderLanguage.HLSL)
+)
+```
+
+How the code is organised, and how to add a lint rule or a tool backend, is in [docs/architecture.md](docs/architecture.md).
+
 ## Requirements
 
 - Python 3.11 or newer.

@@ -6,7 +6,7 @@ import typer
 
 from shaderflux import __version__
 from shaderflux.cli.config_cmd import config_app
-from shaderflux.cli.doctor import doctor_command
+from shaderflux.cli.doctor_cmd import doctor_command
 from shaderflux.cli.lint_cmd import explain_command, lint_command
 from shaderflux.cli.translate_cmd import translate_command
 

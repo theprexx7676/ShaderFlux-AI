@@ -17,6 +17,10 @@ make check        # lint + type check + unit tests
 Without `make`: `uv venv && uv pip install -e ".[dev]"`, then run `ruff`, `mypy`
 and `pytest` from the virtual environment.
 
+## Where things go
+
+Read `docs/architecture.md` first. In short: logic in `workflows/` (not `cli/`), file handling in `source/`, anything that runs a program in `tools/`, lint rules in `analysis/`. The architecture test fails with the file name if a change breaks the layering. The same page has short recipes for adding a lint rule, a tool backend or a command.
+
 ## Tests
 
 - `make test` runs the fast unit tests. No network, no external tools.

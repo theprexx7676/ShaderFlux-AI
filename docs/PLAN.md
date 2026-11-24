@@ -107,6 +107,7 @@ Goal: a clean, buildable, tested, documented empty project that other phases can
 - **Acceptance:** templates appear in the GitHub UI.
 
 ### 1.6 Directory skeleton
+*(This was the initial layout. The code was later restructured into a one-way stack with new `source` and `workflows` packages; the current layout and the test that enforces it are described in `docs/architecture.md`.)*
 ```
 src/shaderflux/
   cli/            command definitions

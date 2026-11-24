@@ -9,6 +9,7 @@ from functools import lru_cache
 from importlib import resources
 
 from shaderflux.analysis.findings import Confidence, Finding
+from shaderflux.core.errors import ShaderFluxError
 from shaderflux.core.models import Severity, ShaderLanguage
 from shaderflux.core.text import LineIndex
 from shaderflux.source.includes import mask_comments
@@ -32,7 +33,7 @@ def load_intrinsics() -> tuple[Intrinsic, ...]:
     data = tomllib.loads(
         resources.files("shaderflux.analysis").joinpath("data/intrinsics.toml").read_text("utf-8")
     )
-    return tuple(
+    entries = tuple(
         Intrinsic(
             hlsl=raw.get("hlsl"),
             glsl=raw.get("glsl"),
@@ -45,6 +46,13 @@ def load_intrinsics() -> tuple[Intrinsic, ...]:
         )
         for raw in data["intrinsic"]
     )
+    for entry in entries:
+        if entry.flag and not (entry.rule and entry.title and entry.fix):
+            name = entry.hlsl or entry.glsl
+            raise ShaderFluxError(
+                f"intrinsics.toml: {name} is flagged but lacks rule, title or fix"
+            )
+    return entries
 
 
 def lookup(name: str) -> list[Intrinsic]:
@@ -65,7 +73,7 @@ def check_intrinsics(
     lines = LineIndex(masked)
     findings: list[Finding] = []
     for entry in load_intrinsics():
-        if not entry.flag:
+        if not entry.flag or entry.rule is None:
             continue
         name = entry.hlsl if language is ShaderLanguage.HLSL else entry.glsl
         if not name or not re.fullmatch(r"\w+", name):
@@ -73,7 +81,7 @@ def check_intrinsics(
         for match in re.finditer(rf"\b{name}\s*\(", masked):
             findings.append(
                 Finding(
-                    rule=entry.rule or "INT000",
+                    rule=entry.rule,
                     severity=Severity.NOTE,
                     message=f"{name}(): {entry.title}. {entry.note or ''}".strip(),
                     file=file,

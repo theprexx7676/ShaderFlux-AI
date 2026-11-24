@@ -6,6 +6,13 @@ and the project aims to follow [Semantic Versioning](https://semver.org/) once r
 
 ## [Unreleased]
 
+### Changed (structure)
+- The code is a one-way stack of packages, checked by a test: `core` < `source`, `tools` < `verify`, `analysis` < `pipeline` < `llm` < `reporting` < `workflows` < `cli`. The documented layering had been wrong.
+- New `source` package (inputs, includes, glob patterns) so `analysis` no longer depends on `pipeline`.
+- New `workflows` package: the translate logic moved out of the CLI; the command is now options in, output out.
+- `tools/base.py` split into `base`, `validation` and `registry`; `cli/doctor.py` renamed to `doctor_cmd.py`.
+- New public Python API, `shaderflux.api`, and `python -m shaderflux`.
+
 ### Fixed (CI findings)
 - The GitHub Action script failed on macOS (bash 3.2 has no `globstar`). `shaderflux lint` now expands glob patterns itself, including `**`, so Windows and macOS behave like Linux.
 
