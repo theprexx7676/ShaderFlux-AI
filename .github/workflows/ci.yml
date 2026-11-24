@@ -44,3 +44,23 @@ jobs:
         with:
           name: coverage
           path: coverage.xml
+
+  # The tests that run the real shader tools (glslang, glslc, SPIRV-Cross, SPIRV-Tools).
+  # Ubuntu only: the tools come from apt. There is no `dxc` here, so the DXC tests skip.
+  integration-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install shader tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y spirv-tools glslang-tools spirv-cross glslc
+          shaderflux_tools="spirv-val spirv-opt spirv-dis spirv-cross glslangValidator glslc"
+          for tool in $shaderflux_tools; do command -v "$tool"; done
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+      - run: uv pip install -e ".[dev]"
+      - run: python -m shaderflux doctor
+        continue-on-error: true  # dxc is expected to be missing; this just logs what was found
+      - run: python -m pytest -m "needs_tools and not needs_llm and not needs_gpu" -rs

@@ -237,7 +237,7 @@ Only `translate --repair` talks to the network: when a shader fails to compile i
 ## Roadmap
 
 - [x] Project idea and scope
-- [x] Foundation: repository layout, tooling, packaging (CI configured, not yet observed running)
+- [x] Foundation: repository layout, tooling, packaging (CI green on Linux, macOS and Windows with Python 3.11 to 3.13)
 - [ ] Deterministic conversion pipeline with compiler wrappers (done for GLSL input; HLSL needs DXC verification)
 - [x] Analysis: reflection, binding collisions, matrix and intrinsic checks, `lint` and `explain` (DXC-side verification pending)
 - [x] LLM repair loop with compiler verification (offline-tested; live API not yet exercised)

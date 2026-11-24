@@ -59,7 +59,7 @@ These are things I said before that need fixing or a caveat:
 
 Goal: a clean, buildable, tested, documented empty project that other phases can build on.
 
-**Progress:** implemented and verified locally (`make check`: ruff, mypy strict, 9 tests passing; pre-commit hooks pass; `uv` and plain `pip install -e .` both work). The CI workflow has not been observed running yet. Decisions D1 to D9 were taken at their defaults, with the copyright holder set to "ShaderFlux-AI contributors" (D7), which is easy to change.
+**Progress:** implemented and verified locally (`make check`: ruff, mypy strict, 9 tests passing; pre-commit hooks pass; `uv` and plain `pip install -e .` both work). CI first ran on pull request #1 and, after fixes, passed on Linux, macOS and Windows (Python 3.11 to 3.13); POSIX-only tests are skipped on Windows. Decisions D1 to D9 were taken at their defaults, with the copyright holder set to "ShaderFlux-AI contributors" (D7), which is easy to change.
 
 ### 1.1 Legal and project files
 - [x] 1.1.1 Add `LICENSE` (MIT) once D7 gives the copyright holder.
