@@ -71,6 +71,6 @@ Dependency direction: `cli -> pipeline -> analysis/tools -> core`.
   skip until `dxc` exists.
 - Lint rules are heuristic (token based). Their 100% score on `tests/corpus/lint/` is a
   regression guard written by the same author, not independent evidence.
-- CI has not been observed running (needs a pull request or a push to `main`).
+- CI first ran on pull request #1: the `lint` job passed, but every test job failed at the install step because of a bug in `ci.yml` (fixed afterwards). Check the latest run before assuming CI is green; Windows and macOS test runs were not seen to pass.
 - The LLM layer (`llm/`, `translate --repair`) is tested only with a scripted fake model. It has **never run against the live API** (no key was available), so real prompt quality and success rates are unknown. The Anthropic request uses `output_config` (effort and JSON schema), no `thinking`/sampling parameters (current models reject them), and tries server-side refusal fallbacks first, retrying without them if rejected.
 - Verification beyond SPIR-V validation, reports, batch mode and the `fix` command are not built.

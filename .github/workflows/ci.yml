@@ -32,11 +32,13 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+      # setup-uv creates and activates a virtual environment when given a Python version,
+      # so do not create another one (that was the failure in the first CI run).
       - uses: astral-sh/setup-uv@v5
         with:
           python-version: ${{ matrix.python }}
-      - run: uv venv && uv pip install -e ".[dev]"
-      - run: uv run pytest -m "not needs_tools and not needs_llm and not needs_gpu" --cov --cov-report=xml
+      - run: uv pip install -e ".[dev]"
+      - run: python -m pytest -m "not needs_tools and not needs_llm and not needs_gpu" --cov --cov-report=xml
       - uses: actions/upload-artifact@v4
         if: matrix.os == 'ubuntu-latest' && matrix.python == '3.13'
         with:
