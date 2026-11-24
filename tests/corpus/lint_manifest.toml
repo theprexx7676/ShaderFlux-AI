@@ -47,3 +47,13 @@ why = "non-square matrix array"
 file = "inverse_mod.frag"
 rules = ["INT001", "INT002"]
 why = "GLSL mod and inverse"
+
+[[case]]
+file = "gl_to_vulkan.frag"
+rules = ["VKG002", "VKG003", "VKG004"]
+why = "desktop OpenGL GLSL: a loose uniform, a sampler without binding, in/out without location"
+
+[[case]]
+file = "vulkan_ok.frag"
+rules = []
+why = "the same shader written for Vulkan GLSL: a false positive here is a bug"

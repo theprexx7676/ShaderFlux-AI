@@ -18,6 +18,7 @@ from shaderflux.analysis.findings import Confidence, Finding
 from shaderflux.analysis.intrinsics import check_intrinsics
 from shaderflux.analysis.limits import exceeds_limits, skipped_finding
 from shaderflux.analysis.matrix_rules import check_matrices
+from shaderflux.analysis.vulkan_glsl import check_vulkan_glsl
 from shaderflux.core.errors import InvalidInputError
 from shaderflux.core.models import Severity, ShaderLanguage
 from shaderflux.source.includes import build_include_graph
@@ -49,6 +50,8 @@ def lint_text(
         findings += binding_findings(
             propose_policy(parse_hlsl_bindings(text, file=file)), file=file
         )
+    if language is ShaderLanguage.GLSL and vulkan:
+        findings += check_vulkan_glsl(text, file=file)
     findings += check_matrices(text, language, file=file)
     findings += check_intrinsics(text, language, file=file)
     return sorted(findings, key=lambda f: (f.file or "", f.line or 0, f.rule))
@@ -93,6 +96,8 @@ def lint_file(
             continue
         report.findings += check_matrices(text, language, file=name)
         report.findings += check_intrinsics(text, language, file=name)
+        if language is ShaderLanguage.GLSL and vulkan:
+            report.findings += check_vulkan_glsl(text, file=name)
         if language is ShaderLanguage.HLSL and vulkan:
             all_bindings += parse_hlsl_bindings(text, file=name)
     if all_bindings:

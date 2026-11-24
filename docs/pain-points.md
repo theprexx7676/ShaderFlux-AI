@@ -55,6 +55,29 @@ experiment 2 in [matrix-conventions.md](matrix-conventions.md).
 
 *Tool:* rules `INT001` to `INT003`.
 
+## 5. OpenGL GLSL that Vulkan GLSL rejects
+
+A GLSL shader that a desktop OpenGL driver accepts is not necessarily valid Vulkan GLSL.
+Four constructs come up again and again when porting: `gl_VertexID` / `gl_InstanceID` (renamed
+to `gl_VertexIndex` / `gl_InstanceIndex`), plain `uniform float x;` outside a block, samplers and
+images without `layout(binding = N)`, and `in` / `out` variables without `layout(location = N)`.
+They already fail when compiled, but the compiler stops at the first one and does not say what to
+write instead.
+
+Source: the [GL_KHR_vulkan_glsl](https://github.com/KhronosGroup/GLSL/blob/main/extensions/khr/GL_KHR_vulkan_glsl.txt)
+extension.
+
+*Tool:* rules `VKG001` to `VKG004`, each with the replacement to write.
+
+*Verified:* with glslangValidator 15.1.0, each construct is rejected for Vulkan with these
+messages: `'gl_VertexID' : undeclared identifier (Did you mean gl_VertexIndex?)`, `'non-opaque
+uniforms outside a block' : not allowed when using GLSL for Vulkan`, `'binding' :
+sampler/texture/image requires layout(binding=X)`, `'location' : SPIR-V requires location for
+user input/output`. A table of 26 snippets is run through both our rules and glslang, and they
+agree on every one (`tests/integration/test_vulkan_glsl.py`). Not verified: that
+`gl_VertexIndex` differs from `gl_VertexID` for a non-zero base vertex (from the extension text
+only).
+
 ## Why a tool, not a guide
 
 Each of these has a written explanation somewhere, and developers still lose

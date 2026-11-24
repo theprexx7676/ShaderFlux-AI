@@ -22,6 +22,7 @@ from shaderflux.analysis.limits import MAX_LINE_CHARS, MAX_LINT_CHARS, exceeds_l
 from shaderflux.analysis.lint import lint_text
 from shaderflux.analysis.matrix_rules import check_matrices
 from shaderflux.analysis.rules import get_rule
+from shaderflux.analysis.vulkan_glsl import check_vulkan_glsl
 from shaderflux.core.models import ShaderLanguage as L
 from shaderflux.core.text import LineIndex
 
@@ -53,6 +54,16 @@ def adversarial(n: int) -> dict[str, str]:
         "slashes": "/" * n,
         "struct spam": "struct S {" * (n // 12) + "ConstantBuffer<S> c;",
         "transpose spam": "transpose(" * (n // 3),
+        "unclosed layout groups": "layout(location = 1" * (n // 19),
+        "layout without parentheses": "layout " * (n // 7),
+        "many uniform blocks": "uniform U {" * (n // 11),
+        "many loose uniforms": "uniform float a;\n" * (n // 17),
+        "many interface variables": "in vec2 a;\nout vec4 b;\n" * (n // 24),
+        "many preprocessor lines": "#if X\n" * (n // 6),
+        "preprocessor without newline": "#" + "x" * n,
+        "unclosed parentheses": "(" * n,
+        "stray closing braces": "}" * n,
+        "huge single declaration": "uniform " + "float a, " * (n // 9) + "z;",
     }
 
 
@@ -69,6 +80,8 @@ def run_rules_directly(text: str, language: L) -> None:
         binding_findings(propose_policy(parse_hlsl_bindings(text)))
     check_matrices(text, language)
     check_intrinsics(text, language)
+    if language is L.GLSL:
+        check_vulkan_glsl(text)
     if language is L.HLSL:
         apply_edits(text, plan_fixes(text).edits)
 

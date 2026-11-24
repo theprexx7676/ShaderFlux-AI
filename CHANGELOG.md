@@ -10,6 +10,7 @@ and the project aims to follow [Semantic Versioning](https://semver.org/) once r
 - The project no longer leans on an LLM: everything useful runs with no API key, account or network. The AI repair (`translate --repair`) is documented and labelled as optional and experimental, uses only the user's own key, and has never run against the live API.
 
 ### Added
+- Lint rules `VKG001` to `VKG004` for GLSL going to Vulkan: `gl_VertexID` / `gl_InstanceID`, uniforms outside a block, samplers or images without a binding, inputs and outputs without a location. Each comes with the replacement to write. Checked against glslangValidator 15.1.0 on 26 snippets (it agrees on all) and on the corpus.
 - `shaderflux init` writes a starter `shaderflux.toml` and, with `--github`, a workflow that lints shaders on pull requests. It never overwrites files without `--force` and checks everything before writing. New public API `run_init`.
 - `docs/tutorial-first-port.md`: a 10-minute walkthrough with real output.
 - `shaderflux fix` accepts several files and glob patterns (`--check` over a whole tree for CI).

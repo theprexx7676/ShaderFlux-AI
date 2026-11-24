@@ -87,6 +87,8 @@ matches what the CPU uploads
 Run shaderflux explain <RULE> for the why and how to fix.
 ```
 
+For GLSL going to Vulkan it also flags what glslang would reject (`gl_VertexID`, loose uniforms, samplers without a binding, inputs and outputs without a location) and says what to write instead.
+
 `shaderflux explain BND001` gives the short story: why it happens, how to fix it, and how sure the tool is. The problems it looks for (bindings that collide, matrices that end up transposed, `mul` written in two orders, functions that are not plain renames) are the ones developers keep hitting; the sources are in [docs/pain-points.md](docs/pain-points.md) and the experiments in [docs/matrix-conventions.md](docs/matrix-conventions.md). Use `--sarif` to see findings in GitHub code scanning, or `--json` for scripts.
 
 ## Fix them, without AI
