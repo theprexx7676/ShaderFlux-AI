@@ -61,6 +61,15 @@ Tool binaries live on `PATH` (apt: spirv-tools, glslang-tools, spirv-cross, glsl
 - `GLSL -> GLSL` needs `--roundtrip` on purpose; it rewrites the code.
 - Use absolute paths in shell commands; a stray `cd` into a subfolder changes the working directory.
 
+## Review rhythm (standing rule from the owner)
+
+**Every 3 or 4 steps, stop and review everything done since the last review**, then correct what
+is wrong before continuing: re-read the changed code with fresh eyes, run the feature the way a
+user would (a scratch directory, the installed wheel, hostile or odd inputs), re-check that docs
+and README claims match what a real tool showed, and read the latest CI run itself, not only its
+summary event. Fix mistakes in the same pass, with a test that fails without the fix, and say in
+the report what the review found. A "step" is one feature, fix or doc change.
+
 ## Lessons from reviewing my own work
 
 - Code that scans untrusted shader text must be **linear time**. Avoid adjacent `\s*` quantifiers, unbounded `[^x]*` before a required token, scanning backwards with a regex, and per-match `text.count("\n", 0, pos)` (use `core.text.LineIndex`). `tests/unit/test_lint_performance.py` feeds hostile inputs to every rule; extend it when adding a rule.

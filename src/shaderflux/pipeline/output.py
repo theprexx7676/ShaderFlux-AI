@@ -37,16 +37,27 @@ def write_output(result: TranslationResult, path: Path, *, force: bool = False) 
 def write_bytes_atomic(path: Path, data: bytes) -> None:
     """Write ``data`` to ``path`` through a temporary file in the same directory.
 
-    An existing file keeps its permission bits. Overwrite policy is the caller's job.
+    A symbolic link is followed (the file it points to is replaced, the link stays), and an
+    existing file keeps its permission bits. Overwrite policy is the caller's job. Problems
+    with the destination (no such directory, no permission, ...) become ``InvalidInputError``.
     """
-    path.parent.mkdir(parents=True, exist_ok=True)
-    handle, tmp_name = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.", suffix=".tmp")
+    if path.is_symlink():
+        path = path.resolve()
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        handle, tmp_name = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.", suffix=".tmp")
+    except OSError as exc:
+        raise InvalidInputError(f"cannot write {path}: {exc.strerror or exc}") from exc
     try:
         with os.fdopen(handle, "wb") as tmp:
             tmp.write(data)
         if path.exists():
             shutil.copymode(path, tmp_name)
         os.replace(tmp_name, path)
+    except OSError as exc:
+        with contextlib.suppress(OSError):
+            os.unlink(tmp_name)
+        raise InvalidInputError(f"cannot write {path}: {exc.strerror or exc}") from exc
     except BaseException:
         with contextlib.suppress(OSError):
             os.unlink(tmp_name)

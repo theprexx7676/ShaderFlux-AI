@@ -191,6 +191,8 @@ def run_fix(
     """
     check_fix_request(request)
     path = Path(request.input_file)
+    if path.is_dir():
+        raise InvalidInputError(f"{path} is a directory; give a shader file or a glob")
     if not path.is_file():
         raise InvalidInputError(f"no such file: {path}")
     if (detect_language(path) or ShaderLanguage.HLSL) is not ShaderLanguage.HLSL:

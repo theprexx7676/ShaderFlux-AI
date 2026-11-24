@@ -138,6 +138,41 @@ def test_fix_verify_confirms_the_fix_and_catches_a_partial_one(
     assert partial.verification.status is VerifyStatus.COLLISIONS, partial.verification.detail
 
 
+def test_fix_matrix_qualifier_compiles_in_every_declaration_form_and_changes_nothing() -> None:
+    """MAT002 fix: `column_major` before const, arrays, matrix<...> and multi-declarators.
+
+    Claim under test: the inserted qualifier is accepted by DXC in each form and the member
+    layout (offsets, strides, majorness) is identical before and after.
+    """
+    from shaderflux.analysis.autofix import apply_edits, plan_fixes
+    from shaderflux.analysis.reflection import parse_reflection
+    from shaderflux.tools.spirv_cross import SpirvCrossBackend
+
+    require_tool("dxc", "spirv-cross")
+    original = (
+        "cbuffer U : register(b0)\n{\n"
+        "    float4x4 plain;\n    const float4x4 withconst;\n    float4x4 bones[2];\n"
+        "    matrix<float, 4, 4> generic;\n    matrix generic2;\n    float3x3 small, other;\n};\n"
+        "float4 main(float4 p : POSITION) : SV_Position\n{\n"
+        "    return mul(p, plain) + mul(p, withconst) + mul(p, bones[1]) + mul(p, generic)\n"
+        "         + mul(p, generic2) + float4(mul(p.xyz, small) + mul(p.xyz, other), 0);\n}\n"
+    )
+    fixed = apply_edits(original, plan_fixes(original, rules={"MAT002"}).edits)
+    assert fixed != original
+
+    def layout(text: str) -> dict[str, tuple[bool, int | None, int | None]]:
+        source = ShaderSource(text=text, language=ShaderLanguage.HLSL, stage=ShaderStage.VERTEX)
+        compiled = DxcBackend.discover().compile(source, target=SPIRV)
+        assert compiled.ok, [d.format() for d in compiled.diagnostics]
+        assert compiled.output is not None
+        reflection = parse_reflection(SpirvCrossBackend.discover().reflect(compiled.output).text)
+        block = reflection.find("type.U") or reflection.find("U")
+        assert block is not None
+        return {m.name: (m.row_major, m.offset, m.matrix_stride) for m in block.members}
+
+    assert layout(fixed) == layout(original)
+
+
 def test_hlsl_translates_to_glsl_with_every_real_tool(corpus: Path) -> None:
     from shaderflux.pipeline.translate import TranslateOptions, translate
     from shaderflux.source.inputs import load_source

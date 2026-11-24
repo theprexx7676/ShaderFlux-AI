@@ -360,3 +360,35 @@ def test_cli_one_unreadable_file_does_not_stop_the_others(
     assert result.exit_code == 2  # the worst outcome wins
     assert "a.hlsl" in result.output
     assert "binary file" in result.output
+
+
+# ----------------------------------------------------------------------------- review findings
+
+
+def test_an_unwritable_destination_is_a_clean_error_not_a_traceback(
+    shader: Path, tmp_path: Path
+) -> None:
+    blocker = tmp_path / "plain_file"
+    blocker.write_text("x")
+    with pytest.raises(InvalidInputError, match="cannot write"):
+        run_fix(FixRequest(shader, out=blocker / "x.hlsl"))
+    result = runner.invoke(app, ["fix", "--out", str(blocker / "x.hlsl"), str(shader)])
+    assert result.exit_code == 2
+    assert "Traceback" not in result.output
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="symlinks need privileges on Windows")
+def test_write_follows_a_symlink_instead_of_replacing_it(tmp_path: Path, corpus: Path) -> None:
+    real = tmp_path / "real.hlsl"
+    shutil.copy(corpus / "hlsl" / "collision.hlsl", real)
+    link = tmp_path / "link.hlsl"
+    link.symlink_to(real.name)
+    run_fix(FixRequest(link, write=True))
+    assert link.is_symlink()
+    assert "[[vk::binding(" in real.read_text()
+
+
+def test_a_directory_as_input_is_named_as_such(tmp_path: Path) -> None:
+    (tmp_path / "shaders.hlsl").mkdir()
+    with pytest.raises(InvalidInputError, match="is a directory"):
+        run_fix(FixRequest(tmp_path / "shaders.hlsl"))
