@@ -107,7 +107,7 @@ $ shaderflux fix collision.hlsl
 dry run: nothing was changed (use --write or --out)
 ```
 
-`fix` only **inserts** text (it never deletes or rewrites your code), shows a diff by default, and changes nothing until you pass `--write` (in place) or `--out FILE`. `--check` exits 1 if fixes are pending, which suits CI. It is deterministic: the same input always gives the same output, with no model, key or network. It fixes `BND001` and `MAT002` in HLSL only, skips anything it cannot place safely (and says why), and re-lints the result. `BND001` is not fixed for shaders that `#include` other files, because bindings are decided across all files. The `[[vk::binding]]` attributes give the same bindings as the `-fvk-*-shift` flags that `lint` prints; D3D builds keep using the `register(...)`. A test that needs a real DXC (CI job `dxc-tests`) checks that the fixed file compiles to distinct slots with no flags.
+`fix` only **inserts** text (it never deletes or rewrites your code), shows a diff by default, and changes nothing until you pass `--write` (in place) or `--out FILE`. `--check` exits 1 if fixes are pending, which suits CI. It is deterministic: the same input always gives the same output, with no model, key or network. It fixes `BND001` and `MAT002` in HLSL only, skips anything it cannot place safely (and says why), and re-lints the result. `BND001` is not fixed for shaders that `#include` other files, because bindings are decided across all files. The `[[vk::binding]]` attributes give the same bindings as the `-fvk-*-shift` flags that `lint` prints; D3D builds keep using the `register(...)`. `--verify` recompiles the fixed shader with DXC and checks that no two resources share a binding; it refuses to write a fix that stops a compiling shader from compiling, and says "not verified" (exit 2) when DXC or the shader stage is missing. Tests that need a real DXC (CI job `dxc-tests`) cover both.
 
 ## What you get
 
@@ -204,6 +204,7 @@ shaderflux fix lighting.hlsl
 shaderflux fix lighting.hlsl --write
 shaderflux fix lighting.hlsl --out lighting.vk.hlsl --only BND001
 shaderflux fix lighting.hlsl --check          # exit 1 if there is something to fix (for CI)
+shaderflux fix lighting.hlsl --verify -s fragment   # also recompile the fixed shader with DXC
 
 # Write a report of what was done and what was and was not checked
 shaderflux translate lighting.frag --to hlsl --report report.md

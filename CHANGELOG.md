@@ -10,7 +10,7 @@ and the project aims to follow [Semantic Versioning](https://semver.org/) once r
 - The project no longer leans on an LLM: everything useful runs with no API key, account or network. The AI repair (`translate --repair`) is documented and labelled as optional and experimental, uses only the user's own key, and has never run against the live API.
 
 ### Added
-- `shaderflux fix` (no AI): inserts `[[vk::binding]]` attributes for colliding bindings (BND001) and an explicit `column_major` for unqualified constant-buffer matrices (MAT002). Insertions only, diff by default, `--write`, `--out`, `--only`, `--check`; withheld for BND001 when the shader includes other files. New public API `run_fix`.
+- `shaderflux fix` (no AI): inserts `[[vk::binding]]` attributes for colliding bindings (BND001) and an explicit `column_major` for unqualified constant-buffer matrices (MAT002). Insertions only, diff by default, `--write`, `--out`, `--only`, `--check`, and `--verify` (recompiles with DXC, checks that bindings are distinct, and refuses to write a fix that breaks a compiling shader); withheld for BND001 when the shader includes other files. New public API `run_fix`.
 
 ### Fixed (found by running a real DXC in CI)
 - Translating to HLSL without `--hlsl-model` produced Shader Model 3 HLSL (`sampler2D`, `tex2D`), which DXC rejects. The default is now Shader Model 5.0.

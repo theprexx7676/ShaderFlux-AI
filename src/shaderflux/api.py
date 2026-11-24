@@ -42,7 +42,13 @@ from shaderflux.core.models import (
 from shaderflux.reporting.report import Report, build_report, render_markdown
 from shaderflux.tools.discovery import DoctorReport, doctor
 from shaderflux.verify.levels import Assessment, assess
-from shaderflux.workflows.fix_file import FixOutcome, FixRequest, run_fix
+from shaderflux.workflows.fix_file import (
+    FixOutcome,
+    FixRequest,
+    Verification,
+    VerifyStatus,
+    run_fix,
+)
 from shaderflux.workflows.translate_file import (
     TranslateOutcome,
     TranslateRequest,
@@ -75,6 +81,8 @@ __all__ = [
     "TranslateRequest",
     "TranslationResult",
     "UnsupportedRouteError",
+    "Verification",
+    "VerifyStatus",
     "__version__",
     "all_rules",
     "assess",

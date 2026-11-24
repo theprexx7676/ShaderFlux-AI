@@ -10,9 +10,21 @@ import pytest
 from typer.testing import CliRunner
 
 from shaderflux.analysis.limits import MAX_LINE_CHARS
+from shaderflux.analysis.reflection import Reflection, Resource, ResourceKind
 from shaderflux.cli.app import app
-from shaderflux.core.errors import InvalidInputError
-from shaderflux.workflows.fix_file import FixRequest, run_fix
+from shaderflux.core.errors import InvalidInputError, ToolFailedError
+from shaderflux.core.models import (
+    Diagnostic,
+    Severity,
+    ShaderLanguage,
+    ShaderSource,
+    ShaderStage,
+    Target,
+)
+from shaderflux.tools.base import ToolResult
+from shaderflux.tools.registry import BackendRegistry
+from shaderflux.workflows.fix_file import FixRequest, VerifyStatus, run_fix
+from tests.fakes import result
 
 pytestmark = pytest.mark.unit
 
@@ -151,3 +163,151 @@ def test_cli_only_selects_a_rule(shader: Path) -> None:
 
 def test_cli_bad_input_exits_two(tmp_path: Path) -> None:
     assert runner.invoke(app, ["fix", str(tmp_path / "nope.hlsl")]).exit_code == 2
+
+
+# ----------------------------------------------------------------------------- --verify
+
+
+class _FakeHlsl:
+    """Stands in for DXC: fails on ``BROKEN`` or, when told to, on the attribute we insert."""
+
+    name = "fake-dxc"
+    languages = frozenset({ShaderLanguage.HLSL})
+
+    def __init__(self, *, reject_attribute: bool = False, always_fail: bool = False) -> None:
+        self.reject_attribute = reject_attribute
+        self.always_fail = always_fail
+
+    def compile(self, source: ShaderSource, *, target: Target) -> ToolResult:
+        bad = self.always_fail or (self.reject_attribute and "[[vk::binding" in source.text)
+        if bad:
+            error = Diagnostic(severity=Severity.ERROR, message="boom", tool="fake", line=1)
+            return result("fake-dxc", ok=False, errors=(error,))
+        return result("fake-dxc", output=b"\x03\x02\x23\x07")
+
+
+def _reflection(*slots: tuple[str, int, int]) -> Reflection:
+    return Reflection(
+        resources=[
+            Resource(kind=ResourceKind.SAMPLED_IMAGE, name=n, type="t", set=s, binding=b)
+            for n, s, b in slots
+        ]
+    )
+
+
+def _registry(compiler: _FakeHlsl) -> BackendRegistry:
+    reg = BackendRegistry()
+    reg.register_compiler(compiler)  # type: ignore[arg-type]
+    return reg
+
+
+def _fragment(tmp_path: Path, corpus: Path) -> Path:
+    path = tmp_path / "collision_ps.hlsl"
+    shutil.copy(corpus / "hlsl" / "collision.hlsl", path)
+    return path
+
+
+def test_verify_ok_when_it_compiles_and_every_binding_is_distinct(
+    tmp_path: Path, corpus: Path
+) -> None:
+    outcome = run_fix(
+        FixRequest(_fragment(tmp_path, corpus), verify=True),
+        registry=_registry(_FakeHlsl()),
+        reflector=lambda _spirv: _reflection(("a", 0, 0), ("b", 0, 1)),
+    )
+    assert outcome.verification is not None
+    assert outcome.verification.status is VerifyStatus.OK
+    assert "fake-dxc" in (outcome.verification.tool or "")
+
+
+def test_verify_reports_bindings_that_are_still_shared(tmp_path: Path, corpus: Path) -> None:
+    outcome = run_fix(
+        FixRequest(_fragment(tmp_path, corpus), verify=True),
+        registry=_registry(_FakeHlsl()),
+        reflector=lambda _spirv: _reflection(("a", 0, 0), ("b", 0, 0)),
+    )
+    assert outcome.verification is not None
+    assert outcome.verification.status is VerifyStatus.COLLISIONS
+    assert "set 0 binding 0: a, b" in outcome.verification.detail
+
+
+def test_verify_without_a_compiler_says_nothing_was_checked(tmp_path: Path, corpus: Path) -> None:
+    outcome = run_fix(
+        FixRequest(_fragment(tmp_path, corpus), verify=True),
+        registry=BackendRegistry(),
+        reflector=None,
+    )
+    assert outcome.verification is not None
+    assert outcome.verification.status is VerifyStatus.NOT_RUN
+
+
+def test_verify_needs_a_stage(tmp_path: Path, corpus: Path) -> None:
+    unnamed = tmp_path / "shader.hlsl"  # no stage in the name, none given
+    shutil.copy(corpus / "hlsl" / "collision.hlsl", unnamed)
+    outcome = run_fix(
+        FixRequest(unnamed, verify=True), registry=_registry(_FakeHlsl()), reflector=None
+    )
+    assert outcome.verification is not None
+    assert outcome.verification.status is VerifyStatus.NOT_RUN
+    assert "stage" in outcome.verification.detail
+    given = run_fix(
+        FixRequest(unnamed, verify=True, stage=ShaderStage.FRAGMENT),
+        registry=_registry(_FakeHlsl()),
+        reflector=lambda _spirv: _reflection(("a", 0, 0)),
+    )
+    assert given.verification is not None
+    assert given.verification.status is VerifyStatus.OK
+
+
+def test_a_fix_that_breaks_compilation_is_not_written(tmp_path: Path, corpus: Path) -> None:
+    path = _fragment(tmp_path, corpus)
+    before = path.read_bytes()
+    outcome = run_fix(
+        FixRequest(path, write=True, verify=True),
+        registry=_registry(_FakeHlsl(reject_attribute=True)),
+        reflector=None,
+    )
+    assert outcome.verification is not None
+    assert outcome.verification.status is VerifyStatus.REGRESSED
+    assert outcome.written_to is None
+    assert path.read_bytes() == before
+    assert any("not written" in note for note in outcome.notes)
+
+
+def test_a_shader_that_never_compiled_is_reported_as_such(tmp_path: Path, corpus: Path) -> None:
+    outcome = run_fix(
+        FixRequest(_fragment(tmp_path, corpus), verify=True),
+        registry=_registry(_FakeHlsl(always_fail=True)),
+        reflector=None,
+    )
+    assert outcome.verification is not None
+    assert outcome.verification.status is VerifyStatus.STILL_BROKEN
+
+
+def test_cli_verify_without_a_compiler_exits_two_and_says_not_verified(
+    tmp_path: Path, corpus: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        "shaderflux.workflows.fix_file.default_registry", lambda **_kw: BackendRegistry()
+    )
+    result = runner.invoke(app, ["fix", "--verify", str(_fragment(tmp_path, corpus))])
+    assert result.exit_code == 2
+    assert "not verified" in result.output
+
+
+def test_cli_stage_without_verify_is_an_error(shader: Path) -> None:
+    assert runner.invoke(app, ["fix", "--stage", "fragment", str(shader)]).exit_code == 2
+
+
+def test_a_failed_reflection_keeps_the_fact_that_it_compiled(tmp_path: Path, corpus: Path) -> None:
+    def broken(_spirv: bytes) -> Reflection:
+        raise ToolFailedError("spirv-cross", "reflection failed: nope")
+
+    outcome = run_fix(
+        FixRequest(_fragment(tmp_path, corpus), verify=True),
+        registry=_registry(_FakeHlsl()),
+        reflector=broken,
+    )
+    assert outcome.verification is not None
+    assert outcome.verification.status is VerifyStatus.OK
+    assert "bindings not checked" in outcome.verification.detail

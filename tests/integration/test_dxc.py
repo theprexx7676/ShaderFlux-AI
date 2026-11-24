@@ -116,6 +116,28 @@ def test_the_fix_command_output_compiles_to_distinct_slots_without_any_flags(
     assert len(slots) == 5, slots  # b0 t0 t1 s0 u0
 
 
+def test_fix_verify_confirms_the_fix_and_catches_a_partial_one(
+    corpus: Path, tmp_path: Path
+) -> None:
+    """`fix --verify` against the real DXC: full fix passes; fixing only matrices does not."""
+    import shutil
+
+    from shaderflux.workflows.fix_file import FixRequest, VerifyStatus, run_fix
+
+    require_tool("dxc", "spirv-cross")
+    shader = tmp_path / "collision.hlsl"
+    shutil.copy(corpus / "hlsl" / "collision.hlsl", shader)
+    stage = ShaderStage.FRAGMENT
+
+    full = run_fix(FixRequest(shader, verify=True, stage=stage))
+    assert full.verification is not None
+    assert full.verification.status is VerifyStatus.OK, full.verification.detail
+
+    partial = run_fix(FixRequest(shader, rules=["MAT002"], verify=True, stage=stage))
+    assert partial.verification is not None
+    assert partial.verification.status is VerifyStatus.COLLISIONS, partial.verification.detail
+
+
 def test_hlsl_translates_to_glsl_with_every_real_tool(corpus: Path) -> None:
     from shaderflux.pipeline.translate import TranslateOptions, translate
     from shaderflux.source.inputs import load_source
