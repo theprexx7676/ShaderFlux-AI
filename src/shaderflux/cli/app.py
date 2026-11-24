@@ -7,6 +7,7 @@ import typer
 from shaderflux import __version__
 from shaderflux.cli.config_cmd import config_app
 from shaderflux.cli.doctor import doctor_command
+from shaderflux.cli.lint_cmd import explain_command, lint_command
 from shaderflux.cli.translate_cmd import translate_command
 
 app = typer.Typer(
@@ -25,6 +26,8 @@ def _version_callback(value: bool) -> None:
 
 app.command("doctor")(doctor_command)
 app.command("translate")(translate_command)
+app.command("lint")(lint_command)
+app.command("explain")(explain_command)
 app.add_typer(config_app, name="config")
 
 

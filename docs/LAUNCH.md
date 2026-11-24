@@ -10,7 +10,7 @@ You only get one first impression on each community. Do not post until the
 ## Ready to launch (all must be true)
 
 - [ ] **HLSL input verified against a real DXC.** Most people porting have HLSL. A launch that only works for GLSL will disappoint them. (Plan Phase 2.5.)
-- [ ] **One headline feature people can see in 30 seconds.** Best candidate: `shaderflux lint` catching a real porting bug (colliding bindings, mixed `mul` order, transposed matrix). (Plan Phase 4.)
+- [x] **One headline feature people can see in 30 seconds.** `shaderflux lint` catches colliding bindings, mixed `mul` order and risky matrix layouts, with `shaderflux explain` for the why. Built; it still needs a real DXC to confirm the fix flags it prints.
 - [ ] **A recorded terminal demo** (GIF or asciinema, under 30 seconds) at the top of the README.
 - [ ] **Install works in one command** (`pipx install shaderflux` or a Docker image) on Linux, macOS and Windows. (Plan Phase 12.)
 - [ ] **CI is green** and the badge is real.

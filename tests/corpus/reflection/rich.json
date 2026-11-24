@@ -1,0 +1,143 @@
+{
+    "entryPoints" : [
+        {
+            "name" : "main",
+            "mode" : "frag"
+        }
+    ],
+    "types" : {
+        "_29" : {
+            "name" : "Params",
+            "members" : [
+                {
+                    "name" : "mvp",
+                    "type" : "mat4",
+                    "offset" : 0,
+                    "matrix_stride" : 16
+                },
+                {
+                    "name" : "tint",
+                    "type" : "vec4",
+                    "offset" : 64
+                },
+                {
+                    "name" : "weights",
+                    "type" : "float",
+                    "array" : [
+                        4
+                    ],
+                    "array_size_is_literal" : [
+                        true
+                    ],
+                    "offset" : 80,
+                    "array_stride" : 16
+                }
+            ]
+        },
+        "_54" : {
+            "name" : "Data",
+            "members" : [
+                {
+                    "name" : "values",
+                    "type" : "float",
+                    "array" : [
+                        0
+                    ],
+                    "array_size_is_literal" : [
+                        true
+                    ],
+                    "offset" : 0,
+                    "array_stride" : 4
+                }
+            ]
+        },
+        "_62" : {
+            "name" : "Push",
+            "members" : [
+                {
+                    "name" : "offset",
+                    "type" : "vec4",
+                    "offset" : 0
+                }
+            ]
+        }
+    },
+    "inputs" : [
+        {
+            "type" : "vec2",
+            "name" : "uv",
+            "location" : 0
+        },
+        {
+            "type" : "int",
+            "name" : "mode",
+            "location" : 1
+        }
+    ],
+    "outputs" : [
+        {
+            "type" : "vec4",
+            "name" : "color",
+            "location" : 0
+        }
+    ],
+    "textures" : [
+        {
+            "type" : "sampler2D",
+            "name" : "combined",
+            "set" : 1,
+            "binding" : 0
+        }
+    ],
+    "separate_images" : [
+        {
+            "type" : "texture2D",
+            "name" : "tex",
+            "set" : 0,
+            "binding" : 1
+        }
+    ],
+    "separate_samplers" : [
+        {
+            "type" : "sampler",
+            "name" : "samp",
+            "set" : 0,
+            "binding" : 2
+        }
+    ],
+    "images" : [
+        {
+            "type" : "image2D",
+            "name" : "img",
+            "readonly" : true,
+            "set" : 1,
+            "binding" : 1,
+            "format" : "rgba8"
+        }
+    ],
+    "ssbos" : [
+        {
+            "type" : "_54",
+            "name" : "Data",
+            "block_size" : 0,
+            "set" : 2,
+            "binding" : 0
+        }
+    ],
+    "ubos" : [
+        {
+            "type" : "_29",
+            "name" : "Params",
+            "block_size" : 144,
+            "set" : 0,
+            "binding" : 0
+        }
+    ],
+    "push_constants" : [
+        {
+            "type" : "_62",
+            "name" : "pc",
+            "push_constant" : true
+        }
+    ]
+}

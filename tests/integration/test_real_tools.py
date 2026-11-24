@@ -192,3 +192,16 @@ def test_compute_stage(glsl_backend: GlslangBackend | GlslcBackend, corpus: Path
     assert result.ok, result.diagnostics
     assert result.output is not None
     assert looks_like_spirv(result.output)
+
+
+def test_reflect_helper_on_real_module(corpus: Path) -> None:
+    from shaderflux.analysis.reflection import ResourceKind, reflect
+
+    require_tool("spirv-cross")
+    spirv = compile_textured(corpus)
+    reflection = reflect(spirv, SpirvCrossBackend.discover())
+    params = reflection.find("Params")
+    assert params is not None
+    assert params.kind is ResourceKind.UNIFORM_BUFFER
+    assert params.slot == (0, 0)
+    assert reflection.find("tex") is not None

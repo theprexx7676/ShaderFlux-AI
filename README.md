@@ -4,7 +4,7 @@
 
 ShaderFlux-AI helps developers who are porting a game or graphics project to PC and are stuck on the shader step. It wraps the standard open-source shader compilers and uses an LLM (Claude) for the parts those tools cannot do: fixing convention mismatches, mapping bindings, replacing missing intrinsics and explaining compiler errors.
 
-> **Status: early development.** The deterministic part of the pipeline works for GLSL input (translate to HLSL, GLSL or SPIR-V and validate), plus `doctor` and `config show`. HLSL input is implemented but **not yet verified against a real DXC**. The LLM features, lint rules, verification beyond SPIR-V validation, reports and batch mode are **planned, not built**. See the [roadmap](#roadmap) and the [detailed plan](docs/PLAN.md).
+> **Status: early development.** Working today: `shaderflux lint` and `explain` for HLSL and GLSL (binding collisions, matrix-convention traps, intrinsic differences), translation of GLSL input to HLSL, GLSL or SPIR-V with validation, `doctor` and `config show`. HLSL *translation* is implemented but **not yet verified against a real DXC**. The LLM features, verification beyond SPIR-V validation, reports and batch mode are **planned, not built**. See the [roadmap](#roadmap) and the [detailed plan](docs/PLAN.md).
 
 ## Who is this for?
 
@@ -68,6 +68,25 @@ broken.frag:3: error: 'undefined_thing' : undeclared identifier
 translation failed
 ```
 
+## Find porting bugs before they bite
+
+```text
+$ shaderflux lint collision.hlsl
+collision.hlsl:2  error  BND001  Params (b0), albedo (t0), samp (s0), output (u0) all map to Vulkan
+set 0, binding 0: DXC ignores the register type by default
+    fix: compile with -fvk-s-shift 3 all -fvk-t-shift 1 all -fvk-u-shift 4 all (or use
+[[vk::binding]] attributes)
+collision.hlsl:4  note  MAT002  matrix 'mvp' in a constant buffer has no explicit
+row_major/column_major, so its memory layout depends on the compiler's default packing and flags
+    fix: write 'row_major' or 'column_major' on 'mvp' (or add #pragma pack_matrix) so the layout
+matches what the CPU uploads
+
+1 error, 1 note in 1 file(s).
+Run shaderflux explain <RULE> for the why and how to fix.
+```
+
+`shaderflux explain BND001` gives the short story: why it happens, how to fix it, and how sure the tool is. The problems it looks for (bindings that collide, matrices that end up transposed, `mul` written in two orders, functions that are not plain renames) are the ones developers keep hitting; the sources are in [docs/pain-points.md](docs/pain-points.md) and the experiments in [docs/matrix-conventions.md](docs/matrix-conventions.md). Use `--sarif` to see findings in GitHub code scanning, or `--json` for scripts.
+
 ## What you get
 
 **The end result:** one command-line tool, `shaderflux`, that takes a shader and gives you back a PC-ready version plus a report you can trust.
@@ -124,8 +143,8 @@ The LLM never has the last word. A translation is only reported as successful if
 | Feature | What it does |
 | --- | --- |
 | Shader translation | HLSL, GLSL and SPIR-V in; HLSL, GLSL, SPIR-V (and MSL through SPIRV-Cross) out |
-| Binding mapping | Maps register/space bindings to descriptor set/binding layouts and back |
-| Convention checks | Detects likely matrix-layout and `mul`-order mismatches |
+| Binding mapping | Finds register/space collisions and proposes the DXC flags that fix them (**working**) |
+| Convention checks | Detects likely matrix-layout and `mul`-order mismatches (**working**, heuristic) |
 | Error repair | Reads compiler logs and proposes fixes, with a capped retry loop |
 | Verification | Compile, SPIR-V validation, reflection comparison, optional image comparison |
 | Explanations | Every change comes with a short reason, which is useful for learning |
@@ -147,6 +166,13 @@ shaderflux translate pass.vert --to spirv --out pass.spv
 # Defines, include directories, machine-readable result
 shaderflux translate lighting.frag --to hlsl -D TINT=0.5 -I shaders/common --json
 
+# Check shaders for known porting traps (does not change them)
+shaderflux lint lighting.hlsl
+shaderflux lint lighting.hlsl --target any --ignore MAT003 --fail-on warning
+
+# Understand a finding
+shaderflux explain BND001
+
 # Show the effective configuration and where each value comes from
 shaderflux config show
 ```
@@ -158,9 +184,6 @@ Planned, not built yet:
 ```bash
 # Fix a shader using a compiler log
 shaderflux fix broken.frag --log compiler.log
-
-# Check a shader for known porting risks without changing it
-shaderflux lint lighting.hlsl --target vulkan
 ```
 
 ## Requirements
@@ -185,7 +208,7 @@ When LLM features are on, shader source and compiler output are sent to the Anth
 - [x] Project idea and scope
 - [x] Foundation: repository layout, tooling, packaging (CI configured, not yet observed running)
 - [ ] Deterministic conversion pipeline with compiler wrappers (done for GLSL input; HLSL needs DXC verification)
-- [ ] Analysis: reflection, binding map, matrix-convention checks
+- [x] Analysis: reflection, binding collisions, matrix and intrinsic checks, `lint` and `explain` (DXC-side verification pending)
 - [ ] LLM repair loop with verification
 - [ ] Command-line tool and first release
 - [ ] Test corpus and benchmarks

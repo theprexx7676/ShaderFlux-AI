@@ -15,6 +15,9 @@ How to read this document:
 ### 0.1 Product statement
 An open-source assistant that helps developers port shaders to PC. A deterministic compiler chain does the mechanical work. An LLM handles judgment calls. Real compilers and validators verify every result.
 
+### 0.1b Product direction (updated)
+The tool should solve problems people already search for and fail to find answered, and be pleasant to use. In practice that means: **lint-first** (`shaderflux lint` and `shaderflux explain` are the front door, translation is the second step); every message names a concrete fix; output works for people (colour, short text) and for machines (JSON, SARIF for GitHub code scanning); and every claim is backed by evidence recorded in `docs/pain-points.md` or `docs/matrix-conventions.md`. Planned additions that follow from this: a GitHub Action running `lint` on pull requests, an `init` command that writes a starter config, a `--fix-bindings` option that applies the proposed binding flags, and a short guided `shaderflux port` flow.
+
 ### 0.2 Principles
 1. **Tools first, LLM second.** Never ask the LLM to do what DXC, SPIRV-Cross or a lint rule can do exactly.
 2. **Nothing is "done" until verified.** Output is labelled `verified`, `partially verified` or `unverified`.
@@ -276,36 +279,38 @@ Goal: translate shaders end to end with no LLM, whenever the tool chain can do i
 
 Goal: understand a shader well enough to catch porting problems before and after conversion.
 
+**Phase 4 progress:** reflection, binding analysis, matrix and intrinsic rules, and the `lint` / `explain` commands exist and are tested. Evidence for each rule is in `docs/matrix-conventions.md` and `docs/pain-points.md`. The AST spike (4.5) is not started.
+
 ### 4.1 Reflection
-- [ ] 4.1.1 Extract from SPIR-V: entry points, stage, inputs/outputs with locations, descriptor sets and bindings, resource types (UBO, SSBO, textures, samplers, storage images), push constants, workgroup size.
-- [ ] 4.1.2 Use SPIRV-Cross JSON reflection first. Evaluate SPIRV-Reflect as an alternative only if the JSON is insufficient.
-- [ ] 4.1.3 Normalise into a `Reflection` model that is independent of the tool.
-- [ ] 4.1.4 Extract uniform block member names, types, offsets and array strides.
-- [ ] 4.1.5 Tests against golden SPIR-V with hand-written expected reflection.
+- [x] 4.1.1 Extract from SPIR-V: entry points, stage, inputs/outputs with locations, descriptor sets and bindings, resource types (UBO, SSBO, textures, samplers, storage images), push constants, workgroup size.
+- [x] 4.1.2 Use SPIRV-Cross JSON reflection first. Evaluate SPIRV-Reflect as an alternative only if the JSON is insufficient.
+- [x] 4.1.3 Normalise into a `Reflection` model that is independent of the tool.
+- [x] 4.1.4 Extract uniform block member names, types, offsets and array strides.
+- [x] 4.1.5 Tests against golden SPIR-V with hand-written expected reflection.
 - **Acceptance:** reflection of the five golden shaders matches expectations.
 
 ### 4.2 Binding analysis
-- [ ] 4.2.1 Parse HLSL `register(...)` and `[[vk::binding]]` from source (conservative parser, report "could not parse" rather than guessing).
-- [ ] 4.2.2 Build a `BindingMap` from source registers to target set/binding.
-- [ ] 4.2.3 Detect collisions (two resources mapped to the same slot) and gaps.
-- [ ] 4.2.4 Detect register-type mixing (`b`, `t`, `s`, `u`) that DXC maps onto one binding number space by default. **VERIFY** the default behaviour with an experiment (DXC docs say the register type is ignored, which can cause overlap).
-- [ ] 4.2.5 Provide a `BindingPolicy` (shift per register type, explicit overrides) and a function that proposes one automatically.
-- [ ] 4.2.6 Emit a human-readable binding table in the report.
+- [x] 4.2.1 Parse HLSL `register(...)` and `[[vk::binding]]` from source (conservative parser, report "could not parse" rather than guessing). *(`register(...)` and `[[vk::binding]]` are parsed; unparsed constructs are skipped silently, not reported yet.)*
+- [ ] 4.2.2 Build a `BindingMap` from source registers to target set/binding. *(Not done as a model: the default and shifted slots are computed inside `find_collisions`.)*
+- [x] 4.2.3 Detect collisions (two resources mapped to the same slot) and gaps.
+- [ ] 4.2.4 Detect register-type mixing (`b`, `t`, `s`, `u`) that DXC maps onto one binding number space by default. **VERIFY** the default behaviour with an experiment (DXC docs say the register type is ignored, which can cause overlap). *(Documented by DXC's guide (see docs/pain-points.md) but not yet confirmed with an experiment on a real `dxc`.)*
+- [x] 4.2.5 Provide a `BindingPolicy` (shift per register type, explicit overrides) and a function that proposes one automatically.
+- [ ] 4.2.6 Emit a human-readable binding table in the report. *(Not done: findings name the colliding resources and the fix; a full table waits for the report phase.)*
 - **Acceptance:** a shader with overlapping `b0`/`t0` is flagged, and the proposed policy removes the overlap.
 
 ### 4.3 Matrix and convention analysis
-- [ ] 4.3.1 **Research spike with experiments.** Write tiny HLSL and GLSL shaders and inspect the reflected offsets and the generated code to build a verified table covering: storage order in constant buffers, `row_major`/`column_major` qualifiers, `#pragma pack_matrix`, how DXC and SPIRV-Cross treat matrix dimensions (an HLSL `float2x3` versus a GLSL `mat2x3`), and `mul` argument order. Output: `docs/matrix-conventions.md` with evidence for every row.
-- [ ] 4.3.2 Define lint rules from that table, for example: `mul` used with a vector on the left versus right, matrix declared without an explicit qualifier in a shared buffer, matrix constructed from rows or columns, use of `transpose` near uploads.
-- [ ] 4.3.3 Implement a token-based detector first (fast, no AST). Move to an AST only if the experiments show false positives or negatives that need it (see 4.5).
-- [ ] 4.3.4 Each finding carries: rule ID, location, explanation, suggested fix, and confidence.
-- [ ] 4.3.5 Test corpus: for each rule, one positive and one negative example.
+- [ ] 4.3.1 **Research spike with experiments.** Write tiny HLSL and GLSL shaders and inspect the reflected offsets and the generated code to build a verified table covering: storage order in constant buffers, `row_major`/`column_major` qualifiers, `#pragma pack_matrix`, how DXC and SPIRV-Cross treat matrix dimensions (an HLSL `float2x3` versus a GLSL `mat2x3`), and `mul` argument order. Output: `docs/matrix-conventions.md` with evidence for every row. *(Partial: the GLSL / SPIRV-Cross side is done in docs/matrix-conventions.md; the DXC side needs a real `dxc`.)*
+- [x] 4.3.2 Define lint rules from that table, for example: `mul` used with a vector on the left versus right, matrix declared without an explicit qualifier in a shared buffer, matrix constructed from rows or columns, use of `transpose` near uploads.
+- [x] 4.3.3 Implement a token-based detector first (fast, no AST). Move to an AST only if the experiments show false positives or negatives that need it (see 4.5).
+- [x] 4.3.4 Each finding carries: rule ID, location, explanation, suggested fix, and confidence.
+- [ ] 4.3.5 Test corpus: for each rule, one positive and one negative example. *(Partial: most rules have positive and negative tests; MAT003 and MAT005 lack a negative one, and precision and recall are not measured on a corpus yet.)*
 - **Acceptance:** rule precision and recall measured on the corpus and recorded; no rule ships without a negative test.
 
 ### 4.4 Feature and intrinsic compatibility
-- [ ] 4.4.1 Build a data file (`data/intrinsics.toml`) mapping HLSL intrinsics and GLSL built-ins to equivalents, with notes and "no equivalent" entries. Source from official docs and cite them.
-- [ ] 4.4.2 Detect usage of intrinsics, semantics (`SV_*`) and extensions that the chosen target cannot express.
-- [ ] 4.4.3 Detect target-version issues (for example features that need a newer `#version` or Vulkan environment).
-- [ ] 4.4.4 Report each as a finding with a suggested remedy.
+- [x] 4.4.1 Build a data file (`data/intrinsics.toml`) mapping HLSL intrinsics and GLSL built-ins to equivalents, with notes and "no equivalent" entries. Source from official docs and cite them.
+- [ ] 4.4.2 Detect usage of intrinsics, semantics (`SV_*`) and extensions that the chosen target cannot express. *(Partial: only the flagged intrinsics are detected; SV_* semantics and unsupported extensions are not.)*
+- [ ] 4.4.3 Detect target-version issues (for example features that need a newer `#version` or Vulkan environment). *(Not done.)*
+- [x] 4.4.4 Report each as a finding with a suggested remedy.
 - **Acceptance:** at least 30 intrinsics covered with a test each.
 
 ### 4.5 AST evaluation spike
@@ -317,9 +322,9 @@ The original README promised AST analysis. Evaluate before committing.
 - **Acceptance:** a decision record in `docs/decisions/`.
 
 ### 4.6 `lint` command (milestone M2)
-- [ ] 4.6.1 `shaderflux lint file --target vulkan` runs 4.2 to 4.4 and prints findings grouped by severity.
-- [ ] 4.6.2 `--json` and SARIF output so results show up in code scanning tools.
-- [ ] 4.6.3 Exit codes: 0 clean, 1 findings above threshold, 2 error.
+- [x] 4.6.1 `shaderflux lint file --target vulkan` runs 4.2 to 4.4 and prints findings grouped by severity.
+- [x] 4.6.2 `--json` and SARIF output so results show up in code scanning tools.
+- [x] 4.6.3 Exit codes: 0 clean, 1 findings above threshold, 2 error.
 - **Acceptance:** lint of the corpus is stable and documented.
 
 ---
