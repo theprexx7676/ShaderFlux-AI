@@ -2,8 +2,8 @@
 
 Desktop OpenGL GLSL is accepted by a driver, but the Vulkan flavour of GLSL is stricter. Each
 rule below is a construct that glslang (the reference compiler) rejects for Vulkan; the exact
-glslang messages were observed with glslangValidator 15.1.0 (local) and 16.2.0 (CI) and are recorded in
-``docs/pain-points.md`` and in ``tests/integration/test_vulkan_glsl.py``.
+glslang messages were observed with glslangValidator 15.1.0 (local) and 16.2.0 (CI) and are
+recorded in ``docs/pain-points.md`` and in ``tests/integration/test_vulkan_glsl.py``.
 
 The scanner is token based and linear in the size of the input: it splits the text into
 top-level declarations (the text before a ``;`` or ``{`` outside any braces or parentheses) and
