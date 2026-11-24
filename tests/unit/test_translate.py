@@ -124,6 +124,7 @@ def test_full_route_collects_stages() -> None:
         "compile hlsl",
         "validate spirv",
         "convert to glsl",
+        "recompile generated glsl",  # skipped with a warning: the fake has no GLSL compiler
     ]
     assert result.run_id
 
@@ -227,7 +228,8 @@ def test_cache_key_depends_on_target_and_source(tmp_path: Path) -> None:
               options=TranslateOptions(cache=options.cache, roundtrip=True))  # fmt: skip
     changed = hlsl_source().model_copy(update={"text": "float4 main() : SV_Target { return 1; }"})
     translate(changed, GLSL_TARGET, registry=registry, options=options)
-    assert compiler.calls == 3
+    # 3 translations, plus one recompile of the generated HLSL (the fake can compile HLSL)
+    assert compiler.calls == 4
 
 
 def test_cache_is_invalidated_when_an_included_file_changes(tmp_path: Path) -> None:

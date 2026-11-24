@@ -22,6 +22,7 @@ from shaderflux.pipeline.cache import TranslationCache, make_key
 from shaderflux.pipeline.includes import build_include_graph
 from shaderflux.pipeline.routes import HopKind, plan_route
 from shaderflux.tools.base import BackendRegistry, CrossOptions, ToolResult
+from shaderflux.verify.recompile import recheck_generated
 
 DEFAULT_SPIRV_ENVIRONMENT = "vulkan1.2"
 
@@ -34,6 +35,7 @@ class TranslateOptions:
     validate: bool = True
     cross: CrossOptions | None = None
     cache: TranslationCache | None = None
+    recheck: bool = True  # compile the generated GLSL/HLSL again to confirm it is accepted
 
 
 def _fingerprint(backend: object) -> str:
@@ -124,6 +126,7 @@ def translate(
                 target.model_dump_json(),
                 repr(options.roundtrip),
                 repr(options.validate),
+                repr(options.recheck),
                 repr(options.cross),
                 *sorted(include_fingerprint),
                 *(_fingerprint(b) for b in (compiler, cross, validator) if b is not None),
@@ -182,6 +185,18 @@ def translate(
             if not record(f"convert to {hop.target.value}", result):
                 return TranslationResult(ok=False, stages=stages, run_id=run_id)
             output_text = result.text
+
+    if options.recheck and output_text is not None:
+        rechecked = recheck_generated(
+            output_text, source, target, registry, environment=environment
+        )
+        if rechecked is not None:
+            stages.append(rechecked)
+            log.debug("recheck: ok=%s", rechecked.ok)
+            if not rechecked.ok:
+                return TranslationResult(
+                    ok=False, output_text=output_text, stages=stages, run_id=run_id
+                )
 
     final = TranslationResult(
         ok=True,

@@ -18,4 +18,6 @@ and the project aims to follow [Semantic Versioning](https://semver.org/) once r
 - Input detection, `#include` graph with path-traversal guard, route planner, translation cache and atomic output writing.
 - `shaderflux translate` using the deterministic tool chain (no LLM). Tested end to end for GLSL input.
 - `shaderflux lint` and `shaderflux explain` (binding, matrix and intrinsic rules; JSON and SARIF output).
+- Output re-check: the generated GLSL/HLSL is compiled again (`--recheck`, on by default). Found that GLSL generated without `--vulkan` may not compile as Vulkan GLSL.
+- Run reports (`translate --report FILE`, Markdown or JSON) with a verdict and an explicit "not checked" list.
 - LLM repair: `translate --repair` with provider interface, versioned prompts, safe patch application, repair loop and `--dry-run`. Tested offline; not yet run against the live API.

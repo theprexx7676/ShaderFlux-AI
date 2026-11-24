@@ -29,13 +29,10 @@ def test_glsl_to_hlsl(corpus: Path) -> None:
     )
     assert result.ok, result.diagnostics
     assert "cbuffer Params" in (result.output_text or "")
-    assert [s.name for s in result.stages] == [
-        "includes",
-        "compile glsl",
-        "validate spirv",
-        "convert to hlsl",
-    ]
-    tooled = [s for s in result.stages if s.name != "includes"]
+    names = [s.name for s in result.stages]
+    assert names[:4] == ["includes", "compile glsl", "validate spirv", "convert to hlsl"]
+    assert names[4] == "recompile generated hlsl"  # compiled with dxc if present, else skipped
+    tooled = [s for s in result.stages if s.name not in ("includes", "recompile generated hlsl")]
     assert all(s.tool and s.tool.name for s in tooled)
     # spirv-cross builds without --version legitimately report no version
     assert all(s.tool.version for s in tooled if s.tool and s.tool.name != "spirv-cross")
@@ -160,3 +157,72 @@ def test_repair_loop_with_real_compiler_and_scripted_model(corpus: Path) -> None
     assert "undefined_thing" in (corpus / "glsl" / "broken.frag").read_text()  # input untouched
     sent = provider.requests[0].user
     assert "broken.frag:3: error" in sent  # the real glslc/glslang diagnostic reached the prompt
+
+
+def test_generated_glsl_that_is_not_vulkan_glsl_is_caught(corpus: Path) -> None:
+    """Real finding: without --vulkan this shader's GLSL output is not valid Vulkan GLSL."""
+    need_glsl_chain()
+    shader = load_source(corpus / "glsl" / "rich.frag")
+    target = Target(language=ShaderLanguage.GLSL, version="450")
+    plain = translate(
+        shader, target, registry=default_registry(), options=TranslateOptions(roundtrip=True)
+    )
+    assert not plain.ok
+    assert plain.output_text
+    assert plain.stages[-1].name == "recompile generated glsl"
+    assert any("--vulkan" in d.message for d in plain.diagnostics)
+
+    vulkan = translate(
+        shader,
+        target,
+        registry=default_registry(),
+        options=TranslateOptions(roundtrip=True, cross=CrossOptions(vulkan_semantics=True)),
+    )
+    assert vulkan.ok, vulkan.diagnostics
+
+
+def test_report_for_a_real_run_and_a_failed_run(corpus: Path, tmp_path: Path) -> None:
+    import json
+
+    from typer.testing import CliRunner
+
+    from shaderflux.cli.app import app
+
+    need_glsl_chain()
+    runner = CliRunner()
+    ok_path, bad_path = tmp_path / "ok.json", tmp_path / "bad.md"
+    ok = runner.invoke(
+        app,
+        [
+            "translate",
+            str(corpus / "glsl" / "textured.frag"),
+            "--to",
+            "hlsl",
+            "--report",
+            str(ok_path),
+        ],
+    )
+    assert ok.exit_code == 0, ok.output
+    data = json.loads(ok_path.read_text())
+    assert data["ok"] is True
+    assert data["input"]["file"] == "textured.frag"
+    assert data["porting_risks"] == []
+    assert data["verdict"]["level"] >= 2
+    assert any("not compiled again" in n or "recompiled" in n or "compiled again" in n
+               for n in data["verdict"]["checked"] + data["verdict"]["not_checked"])  # fmt: skip
+
+    bad = runner.invoke(
+        app,
+        [
+            "translate",
+            str(corpus / "glsl" / "broken.frag"),
+            "--to",
+            "hlsl",
+            "--report",
+            str(bad_path),
+        ],
+    )
+    assert bad.exit_code == 1
+    markdown = bad_path.read_text()  # a report is written even when the translation fails
+    assert "**Result:** failed" in markdown
+    assert "undefined_thing" in markdown

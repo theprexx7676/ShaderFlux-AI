@@ -92,7 +92,7 @@ Run shaderflux explain <RULE> for the why and how to fix.
 **The end result:** one command-line tool, `shaderflux`, that takes a shader and gives you back a PC-ready version plus a report you can trust.
 
 1. **A translated shader.** HLSL, GLSL or SPIR-V in; HLSL, GLSL, SPIR-V or MSL out, produced by the standard compiler tools rather than guessed.
-2. **A verdict.** Each result says how far it was checked: compiled, validated as SPIR-V, same resources as the original, and (optionally) same pixels. Nothing is called "verified" unless the checks ran.
+2. **A verdict and a report.** Each result says how far it was checked, from what really ran: the source compiled, the SPIR-V validated, the generated GLSL/HLSL compiled again. The report also lists what was **not** checked. Planned additions are same resources as the original and same pixels. Nothing is called "checked" unless the tool ran.
 3. **A list of porting risks.** Before you ship, it flags the classic traps: resource bindings that collide, matrices that may be transposed, `mul` written two different ways, intrinsics that behave differently between APIs.
 4. **Plain-language fixes.** When the tools fail or something looks wrong, the LLM proposes a small, reviewable change and explains why, instead of leaving you with a wall of compiler errors.
 
@@ -172,6 +172,9 @@ shaderflux lint lighting.hlsl --target any --ignore MAT003 --fail-on warning
 
 # Understand a finding
 shaderflux explain BND001
+
+# Write a report of what was done and what was and was not checked
+shaderflux translate lighting.frag --to hlsl --report report.md
 
 # Show the effective configuration and where each value comes from
 shaderflux config show

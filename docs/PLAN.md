@@ -430,13 +430,15 @@ Each task is a prompt + a verifier.
 
 Goal: back every claim of success with evidence.
 
+**Phase 7/8 progress:** the output re-check (`verify/recompile.py`), the verdict (`verify/levels.py`) and run reports (`reporting/report.py`, `translate --report`) exist and are tested. Reflection comparison, numeric and image checks, batch mode and the remaining commands are not built. A real finding from the re-check: GLSL generated without `--vulkan` does not always compile as Vulkan GLSL (`tests/corpus/glsl/rich.frag`).
+
 ### 7.1 Verification levels
-- [ ] 7.1.1 Level 0: output exists and parses.
-- [ ] 7.1.2 Level 1: output compiles with the target's compiler.
-- [ ] 7.1.3 Level 2: SPIR-V validates with `spirv-val` for the target environment.
+- [ ] 7.1.1 Level 0: output exists and parses. *(The levels in `verify/levels.py` differ slightly from this list: 1 = source compiled, 2 = SPIR-V validated, 3 = generated output compiled again. Reflection comparison (old level 3) and numeric or image comparison (level 4) are not built.)*
+- [ ] 7.1.2 Level 1: output compiles with the target's compiler. *(Done for GLSL output (`--recheck`, on by default, compiles the generated GLSL again with glslang or glslc). For HLSL output it needs `dxc`, so it is skipped with a warning here.)*
+- [x] 7.1.3 Level 2: SPIR-V validates with `spirv-val` for the target environment.
 - [ ] 7.1.4 Level 3: reflection of the output matches the source's reflection (see 7.2).
 - [ ] 7.1.5 Level 4: numeric or image comparison passes (7.3, 7.4).
-- [ ] 7.1.6 The report states the highest level reached.
+- [x] 7.1.6 The report states the highest level reached.
 - **Acceptance:** each level has a passing and a failing test.
 
 ### 7.2 Reflection equivalence
@@ -488,9 +490,9 @@ Goal: back every claim of success with evidence.
 - **Acceptance:** snapshot tests for help text and error messages.
 
 ### 8.3 Report format
-- [ ] 8.3.1 JSON report (source of truth) and a Markdown renderer.
-- [ ] 8.3.2 Contents: inputs and hashes, effective config, tool versions, route taken, each attempt, diffs, diagnostics, lint findings, verification results, LLM usage, confidence label, timestamps.
-- [ ] 8.3.3 Report schema versioned and documented.
+- [x] 8.3.1 JSON report (source of truth) and a Markdown renderer.
+- [ ] 8.3.2 Contents: inputs and hashes, effective config, tool versions, route taken, each attempt, diffs, diagnostics, lint findings, verification results, LLM usage, confidence label, timestamps. *(Partial: input hash, route, every step with tool versions, diagnostics, porting risks, repair attempts and diff, model, prompt version and token use are recorded; the effective configuration is not.)*
+- [ ] 8.3.3 Report schema versioned and documented. *(Partial: the report carries `schema_version`; the schema is not documented yet.)*
 - [ ] 8.3.4 Optional HTML renderer later.
 - **Acceptance:** a report from the corpus validates against the schema.
 

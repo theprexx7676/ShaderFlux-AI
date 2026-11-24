@@ -66,6 +66,7 @@ class RepairResult:
     stop_reason: str = ""
     usage: UsageTotals = field(default_factory=UsageTotals)
     prompt_version: str = ""
+    model: str = ""
     files_sent: list[str] = field(default_factory=list)
 
     @property
@@ -201,6 +202,7 @@ def repair_and_translate(
             result.stop_reason = f"the model call failed: {exc}"
             break
         result.usage.add(response)
+        result.model = response.model or result.model
         attempt.input_tokens, attempt.output_tokens = response.input_tokens, response.output_tokens
 
         try:

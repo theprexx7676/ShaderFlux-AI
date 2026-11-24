@@ -7,9 +7,10 @@ from pathlib import Path
 import platformdirs
 import typer
 
+from shaderflux.analysis.lint import lint_file
 from shaderflux.cli.errors import EXIT_FAILED, EXIT_OK, EXIT_TOOL, eprint, handle_errors
 from shaderflux.core.config import load_settings
-from shaderflux.core.errors import InvalidInputError
+from shaderflux.core.errors import InvalidInputError, ShaderFluxError
 from shaderflux.core.logging import setup_logging
 from shaderflux.core.models import Severity, ShaderLanguage, Target, TranslationResult
 from shaderflux.llm.anthropic_provider import AnthropicProvider
@@ -28,6 +29,7 @@ from shaderflux.pipeline.cache import TranslationCache
 from shaderflux.pipeline.inputs import load_source, parse_language_name, parse_stage_name
 from shaderflux.pipeline.output import write_output
 from shaderflux.pipeline.translate import TranslateOptions, translate
+from shaderflux.reporting.report import build_report, write_report
 from shaderflux.tools.base import CrossOptions
 from shaderflux.tools.registry import default_registry
 
@@ -58,6 +60,9 @@ def translate_command(
     environment: str | None = typer.Option(None, "--env", help="SPIR-V env, e.g. vulkan1.2."),
     roundtrip: bool = typer.Option(False, "--roundtrip", help="Allow same-language conversion."),
     validate: bool = typer.Option(True, "--validate/--no-validate", help="Run spirv-val."),
+    recheck: bool = typer.Option(
+        True, "--recheck/--no-recheck", help="Compile the generated GLSL/HLSL again to confirm it."
+    ),
     cache: bool = typer.Option(False, "--cache", help="Reuse results of identical runs."),
     json_output: bool = typer.Option(False, "--json", help="Print the full result as JSON."),
     repair: bool = typer.Option(
@@ -69,6 +74,9 @@ def translate_command(
     max_attempts: int | None = typer.Option(None, "--max-attempts", help="Repair attempts."),
     allow_large_edits: bool = typer.Option(
         False, "--allow-large-edits", help="Accept big rewrites."
+    ),
+    report: Path | None = typer.Option(
+        None, "--report", help="Write a report of this run (.md for Markdown, otherwise JSON)."
     ),
     write_fixed: Path | None = typer.Option(
         None, "--write-fixed", help="With --repair: save the corrected source to this file."
@@ -106,6 +114,7 @@ def translate_command(
     options = TranslateOptions(
         roundtrip=roundtrip,
         validate=validate,
+        recheck=recheck,
         cross=CrossOptions(vulkan_semantics=vulkan),
         cache=TranslationCache(cache_dir) if cache or settings.cache_dir else None,
     )
@@ -161,6 +170,22 @@ def translate_command(
 
     if out is not None and result.ok:
         result.output_path = write_output(result, out, force=force)
+    if report is not None:
+        findings = None
+        if source.path is not None and source.language in (
+            ShaderLanguage.HLSL,
+            ShaderLanguage.GLSL,
+        ):
+            try:
+                findings = lint_file(source.path, include_dirs=source.include_dirs).findings
+            except ShaderFluxError:
+                findings = None
+        original = source.model_copy(update={"text": outcome.original_text}) if outcome else source
+        write_report(
+            build_report(original, target, result, repair=outcome, findings=findings), report
+        )
+        if not quiet and not json_output:
+            eprint(f"report written to {report}")
     if write_fixed is not None and outcome is not None and outcome.ok and outcome.changed:
         fixed = TranslationResult(ok=True, output_text=outcome.source.text)
         write_output(fixed, write_fixed, force=force)
