@@ -29,19 +29,20 @@ case "$target" in vulkan | any) ;; *)
   ;;
 esac
 
-# Expand globs (including **). Patterns that match nothing disappear.
-shopt -s globstar nullglob
-# shellcheck disable=SC2206  # word splitting and globbing of $paths is intended here
-files=($paths)
-if [[ ${#files[@]} -eq 0 ]]; then
-  echo "error: no shader files matched: $paths" >&2
+# Split the space-separated patterns WITHOUT letting the shell expand them: bash 3.2 (the macOS
+# default) has no `**`, and Windows shells expand nothing. `shaderflux lint` expands globs itself.
+set -f
+read -r -a patterns <<<"$paths"
+set +f
+if [[ ${#patterns[@]} -eq 0 ]]; then
+  echo "error: the 'paths' input is required" >&2
   exit 2
 fi
-echo "shaderflux: checking ${#files[@]} file(s)"
+echo "shaderflux: checking ${patterns[*]}"
 
 # 1. Always write the SARIF file first, so it can be uploaded even when the check fails.
-shaderflux lint "${files[@]}" --target "$target" --fail-on never --sarif >"$sarif"
+shaderflux lint "${patterns[@]}" --target "$target" --fail-on never --sarif >"$sarif"
 echo "shaderflux: wrote $sarif"
 
 # 2. Human-readable output in the log; its exit code decides whether the job fails.
-shaderflux lint "${files[@]}" --target "$target" --fail-on "$fail_on"
+shaderflux lint "${patterns[@]}" --target "$target" --fail-on "$fail_on"

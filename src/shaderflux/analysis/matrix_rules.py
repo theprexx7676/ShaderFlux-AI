@@ -93,7 +93,8 @@ def _glsl_matrices(text: str) -> list[_Matrix]:
     return found
 
 
-_MAX_CALL_CHARS = 2000  # a longer argument list is not a real mul() call; stops O(n^2) scans
+_MAX_CALL_CHARS = 1000  # a longer argument list is not a real mul() call; stops O(n^2) scans
+_MAX_NESTING = 16  # nor is one nested deeper than this
 
 
 def _split_args(text: str, open_paren: int) -> list[str] | None:
@@ -105,6 +106,8 @@ def _split_args(text: str, open_paren: int) -> list[str] | None:
         ch = text[i]
         if ch in "([{":
             depth += 1
+            if depth > _MAX_NESTING:
+                return None
             if depth > 1:
                 current.append(ch)
         elif ch in ")]}":

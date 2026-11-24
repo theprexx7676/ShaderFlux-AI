@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pytest
@@ -65,8 +66,13 @@ def test_same_language_is_refused_with_hint(tmp_path: Path) -> None:
     assert "--roundtrip" in result.output
 
 
+ANSI = re.compile(r"\x1b\[[0-9;]*m")
+
+
 def test_help_lists_every_option() -> None:
     result = runner.invoke(app, ["translate", "--help"])
     assert result.exit_code == 0
+    # On CI the help text is coloured and the styling splits "--to" into pieces.
+    text = ANSI.sub("", result.output)
     for flag in ("--to", "--from", "--stage", "--out", "--force", "--roundtrip", "--json"):
-        assert flag in result.output
+        assert flag in text

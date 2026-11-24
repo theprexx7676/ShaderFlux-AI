@@ -27,27 +27,35 @@ from shaderflux.core.text import LineIndex
 pytestmark = pytest.mark.unit
 
 N = 60_000
-LIMIT_S = 4.0  # the fixed code needs well under a second; the broken code needed minutes
+HARD_STOP_S = 10  # a regression fails here instead of hanging CI
+FLOOR_S = 1.5  # anything faster than this is fine, however it scales
+MAX_GROWTH = 8  # 4x the input may cost at most 8x: linear is ~4x, quadratic ~16x
 
-ADVERSARIAL = {
-    "whitespace after a binding attribute": "[[vk::binding(1)]] Texture2D t" + " " * N + "x",
-    "whitespace inside register": "a : register(" + " " * N + "t0)",
-    "whitespace before the colon": "Texture2D t" + " " * N + "x : register(t0);",
-    "whitespace in a matrix keyword": "matrix" + " " * N + "x",
-    "one long word": "a" * N,
-    "many unclosed binding attributes": "[[vk::binding(1)]] a " * (N // 20),
-    "many cbuffers without a brace": "cbuffer C " * (N // 10),
-    "many unclosed cbuffers": "cbuffer C {" * (N // 12),
-    "many mul calls": "mul(" * (N // 3),
-    "deeply nested parentheses": "mul(" + "(" * (N // 12) + "a" + ")" * (N // 12) + ", b)",
-    "many declarations": "Texture2D t : register(t0);\n" * (N // 3),
-    "many matrices": "float4x4 m;\n" * (N // 3),
-    "many real mul calls": "float4 f(){ return mul(v, m); }\n" * (N // 6) + "float4x4 m;",
-    "unclosed comment": "/*" + "x" * N,
-    "slashes": "/" * N,
-    "struct spam": "struct S {" * (N // 12) + "ConstantBuffer<S> c;",
-    "transpose spam": "transpose(" * (N // 3),
-}
+
+def adversarial(n: int) -> dict[str, str]:
+    """Hostile inputs of size ``n``."""
+    return {
+        "whitespace after a binding attribute": "[[vk::binding(1)]] Texture2D t" + " " * n + "x",
+        "whitespace inside register": "a : register(" + " " * n + "t0)",
+        "whitespace before the colon": "Texture2D t" + " " * n + "x : register(t0);",
+        "whitespace in a matrix keyword": "matrix" + " " * n + "x",
+        "one long word": "a" * n,
+        "many unclosed binding attributes": "[[vk::binding(1)]] a " * (n // 20),
+        "many cbuffers without a brace": "cbuffer C " * (n // 10),
+        "many unclosed cbuffers": "cbuffer C {" * (n // 12),
+        "many mul calls": "mul(" * (n // 3),
+        "deeply nested parentheses": "mul(" + "(" * (n // 12) + "a" + ")" * (n // 12) + ", b)",
+        "many declarations": "Texture2D t : register(t0);\n" * (n // 3),
+        "many matrices": "float4x4 m;\n" * (n // 3),
+        "many real mul calls": "float4 f(){ return mul(v, m); }\n" * (n // 6) + "float4x4 m;",
+        "unclosed comment": "/*" + "x" * n,
+        "slashes": "/" * n,
+        "struct spam": "struct S {" * (n // 12) + "ConstantBuffer<S> c;",
+        "transpose spam": "transpose(" * (n // 3),
+    }
+
+
+ADVERSARIAL = adversarial(N)
 
 
 def run_rules_directly(text: str, language: L) -> None:
@@ -72,7 +80,7 @@ def _alarm(_signum: int, _frame: object) -> None:
 
 def _timed(function, *args) -> float:  # type: ignore[no-untyped-def]
     old = signal.signal(signal.SIGALRM, _alarm)
-    signal.alarm(int(LIMIT_S) + 6)  # hard stop so a regression fails instead of hanging CI
+    signal.alarm(HARD_STOP_S)
     try:
         started = time.perf_counter()
         function(*args)
@@ -85,22 +93,36 @@ def _timed(function, *args) -> float:  # type: ignore[no-untyped-def]
 needs_alarm = pytest.mark.skipif(not hasattr(signal, "SIGALRM"), reason="needs SIGALRM (POSIX)")
 
 
+def _assert_scales(function, name: str, *args) -> None:  # type: ignore[no-untyped-def]
+    """Fast enough, or at least growing no faster than roughly linearly.
+
+    Absolute times depend on the machine and on coverage (CI runs with coverage on, which
+    made a tight loop 25x slower), so the real check is how the cost grows with the input.
+    """
+    small_input, big_input = adversarial(N // 4)[name], ADVERSARIAL[name]
+    small = _timed(function, small_input, *args)
+    big = _timed(function, big_input, *args)
+    assert big < FLOOR_S or big <= MAX_GROWTH * max(small, 0.02), (
+        f"{name}: {small:.2f}s for {len(small_input):,} chars, {big:.2f}s for {len(big_input):,}"
+    )
+
+
 @needs_alarm
 @pytest.mark.parametrize("language", [L.HLSL, L.GLSL])
 @pytest.mark.parametrize("name", list(ADVERSARIAL))
-def test_every_rule_is_fast_on_hostile_input(name: str, language: L) -> None:
+def test_every_rule_scales_on_hostile_input(name: str, language: L) -> None:
     """Rules called directly, so the limits cannot hide a slow one."""
-    assert _timed(run_rules_directly, ADVERSARIAL[name], language) < LIMIT_S, name
+    _assert_scales(run_rules_directly, name, language)
 
 
 @needs_alarm
 @pytest.mark.parametrize("name", list(ADVERSARIAL))
-def test_lint_text_is_fast_on_hostile_input_within_the_limits(name: str) -> None:
+def test_lint_text_finishes_on_hostile_input_within_the_limits(name: str) -> None:
     """The whole pipeline, with inputs shrunk to just under the line-length limit."""
     text = ADVERSARIAL[name]
     if len(text.split("\n", 1)[0]) > MAX_LINE_CHARS:
         text = text[: MAX_LINE_CHARS - 1]
-    assert _timed(lint_text, text, L.HLSL) < LIMIT_S, name
+    assert _timed(lint_text, text, L.HLSL) < HARD_STOP_S, name
 
 
 def test_the_limits_really_do_short_circuit_long_lines() -> None:
@@ -159,4 +181,4 @@ def test_long_real_world_file_is_fast() -> None:
     )
     started = time.perf_counter()
     lint_text("float4x4 world0;\n" + body, L.HLSL)
-    assert time.perf_counter() - started < LIMIT_S
+    assert time.perf_counter() - started < HARD_STOP_S

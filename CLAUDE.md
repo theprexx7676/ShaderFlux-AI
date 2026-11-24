@@ -62,6 +62,7 @@ Dependency direction: `cli -> pipeline -> analysis/tools -> core`.
 - **A regression test must be shown to fail on the old code** (restore the old file from git, run it, restore the fix). One test here passed on the bug because a new safety limit short-circuited it.
 - Run a clean wheel install (`uv build --wheel`, install in a fresh venv) before claiming packaging works; editable installs hide missing package data.
 - Anything that costs money or time (an LLM call) must validate its output paths and option combinations **first**.
+- CI found what local runs could not. Shell scripts must work on **bash 3.2** (macOS default: no `globstar`, `mapfile`, `${x,,}`, `declare -A`); Windows shells expand no globs, so the CLI expands patterns itself (`expand_patterns`). CI runs tests **with coverage**, which can slow tight Python loops 25x, so timing tests assert how cost *scales* (`_assert_scales`), never an absolute time. Rich colours CLI `--help` on CI, so tests that read help text strip ANSI codes first.
 - Child processes get a scrubbed environment (`tools/runner.py:clean_environment`); never pass secrets to tools.
 
 ## Known gaps (keep these honest in README and PLAN)
@@ -71,6 +72,6 @@ Dependency direction: `cli -> pipeline -> analysis/tools -> core`.
   skip until `dxc` exists.
 - Lint rules are heuristic (token based). Their 100% score on `tests/corpus/lint/` is a
   regression guard written by the same author, not independent evidence.
-- CI first ran on pull request #1: the `lint` job passed, but every test job failed at the install step because of a bug in `ci.yml` (fixed afterwards). Check the latest run before assuming CI is green; Windows and macOS test runs were not seen to pass.
+- CI on pull request #1: first run failed at install (a `ci.yml` bug, fixed); the second run found real problems on Linux, macOS and Windows (colour codes in help text, a timing test that ignored coverage, bash 3.2 incompatibility in the Action script), fixed in the third push. **Check the latest run before assuming CI is green.** On Windows the POSIX-only tests are skipped (about 77 of them), so Windows coverage is thinner than Linux.
 - The LLM layer (`llm/`, `translate --repair`) is tested only with a scripted fake model. It has **never run against the live API** (no key was available), so real prompt quality and success rates are unknown. The Anthropic request uses `output_config` (effort and JSON schema), no `thinking`/sampling parameters (current models reject them), and tries server-side refusal fallbacks first, retrying without them if rejected.
 - Verification beyond SPIR-V validation, reports, batch mode and the `fix` command are not built.

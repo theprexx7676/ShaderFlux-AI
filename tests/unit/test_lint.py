@@ -215,3 +215,44 @@ def test_explain_lists_and_details_rules() -> None:
     assert "[[vk::binding" in detail.output
     unknown = runner.invoke(app, ["explain", "ZZZ"])
     assert unknown.exit_code == 2
+
+
+# ---- glob expansion (Windows shells and bash 3.2 do not expand ** themselves) ----------
+
+
+def test_expand_patterns_handles_recursive_globs_literals_and_duplicates(tmp_path: Path) -> None:
+    from shaderflux.cli.lint_cmd import expand_patterns
+
+    (tmp_path / "a" / "b").mkdir(parents=True)
+    first, second = tmp_path / "a" / "one.hlsl", tmp_path / "a" / "b" / "two.hlsl"
+    first.write_text("x")
+    second.write_text("x")
+    (tmp_path / "a" / "ignore.txt").write_text("x")
+
+    found = expand_patterns([Path(str(tmp_path / "**" / "*.hlsl"))])
+    assert found == sorted([first, second])
+    # a name that exists is literal; duplicates are removed; order is kept
+    assert expand_patterns([first, Path(str(tmp_path / "a" / "*.hlsl")), first]) == [first]
+    # a plain missing name passes through, so the usual "no such file" error is reported
+    assert expand_patterns([Path("missing.hlsl")]) == [Path("missing.hlsl")]
+
+
+def test_expand_patterns_reports_a_pattern_that_matches_nothing(tmp_path: Path) -> None:
+    from shaderflux.cli.lint_cmd import expand_patterns
+
+    with pytest.raises(InvalidInputError, match="no shader files matched"):
+        expand_patterns([Path(str(tmp_path / "*.hlsl"))])
+    (tmp_path / "dir.hlsl").mkdir()  # a directory is not a shader file
+    with pytest.raises(InvalidInputError, match="no shader files matched"):
+        expand_patterns([Path(str(tmp_path / "*.hlsl"))])
+
+
+def test_lint_command_expands_quoted_patterns(tmp_path: Path, corpus: Path) -> None:
+    import shutil
+
+    (tmp_path / "s").mkdir()
+    shutil.copy(corpus / "hlsl" / "clean_matrix.hlsl", tmp_path / "s" / "a.hlsl")
+    shutil.copy(corpus / "hlsl" / "clean_matrix.hlsl", tmp_path / "s" / "b.hlsl")
+    result = runner.invoke(app, ["lint", str(tmp_path / "s" / "*.hlsl")])
+    assert result.exit_code == 0
+    assert "in 2 file(s)" in result.output

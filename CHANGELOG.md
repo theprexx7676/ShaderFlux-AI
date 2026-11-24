@@ -6,6 +6,9 @@ and the project aims to follow [Semantic Versioning](https://semver.org/) once r
 
 ## [Unreleased]
 
+### Fixed (CI findings)
+- The GitHub Action script failed on macOS (bash 3.2 has no `globstar`). `shaderflux lint` now expands glob patterns itself, including `**`, so Windows and macOS behave like Linux.
+
 ### Fixed (review pass)
 - `lint` could hang for minutes on a crafted file (regex backtracking) and was quadratic on large files; now linear, with size and line-length limits (rule `LNT001`).
 - File names starting with `-` were interpreted as compiler options.

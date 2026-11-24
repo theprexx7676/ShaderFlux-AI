@@ -169,6 +169,7 @@ shaderflux translate lighting.frag --to hlsl -D TINT=0.5 -I shaders/common --jso
 
 # Check shaders for known porting traps (does not change them)
 shaderflux lint lighting.hlsl
+shaderflux lint 'shaders/**/*.hlsl'          # glob patterns work on every platform
 shaderflux lint lighting.hlsl --target any --ignore MAT003 --fail-on warning
 
 # Understand a finding

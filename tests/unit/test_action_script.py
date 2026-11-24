@@ -64,9 +64,9 @@ def test_clean_shader_passes(shaders: Path) -> None:
 def test_recursive_globs_and_several_patterns(shaders: Path) -> None:
     result = run(shaders, paths="shaders/**/*.hlsl", fail_on="never")
     assert result.returncode == 0
-    assert "checking 2 file(s)" in result.stdout
+    assert "in 2 file(s)" in result.stdout
     result = run(shaders, paths="shaders/clean.hlsl shaders/deep/*.hlsl", fail_on="never")
-    assert "checking 2 file(s)" in result.stdout
+    assert "in 2 file(s)" in result.stdout
 
 
 def test_target_any_skips_the_binding_rules(shaders: Path) -> None:
@@ -109,3 +109,15 @@ def test_action_definition_passes_inputs_through_the_environment() -> None:
     assert set(lint["env"]) == {"INPUT_PATHS", "INPUT_FAIL_ON", "INPUT_TARGET", "INPUT_SARIF_FILE"}
     assert action["runs"]["using"] == "composite"
     assert action["inputs"]["paths"]["required"] is True
+
+
+def test_script_avoids_bash_4_features() -> None:
+    """macOS ships bash 3.2: no `globstar`, `mapfile`/`readarray`, `${x,,}` or `declare -A`.
+
+    This was a real failure on the first CI run (`shopt: globstar: invalid shell option`).
+    """
+    text = "\n".join(
+        line for line in SCRIPT.read_text().splitlines() if not line.lstrip().startswith("#")
+    )
+    for feature in ("globstar", "mapfile", "readarray", "declare -A", ",,}", "^^}", "&>>", "|&"):
+        assert feature not in text, f"bash 4+ feature in the script: {feature}"
