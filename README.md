@@ -23,6 +23,51 @@ Translating shaders between platforms is slow and error-prone. The mechanical pa
 
 ShaderFlux-AI automates the mechanical steps, uses the LLM for the judgment calls, and **checks every result with real compilers and validators** before calling it done.
 
+## Demo
+
+A GLSL fragment shader goes in:
+
+```glsl
+#version 450
+layout(location=0) in vec2 uv;
+layout(location=0) out vec4 color;
+layout(set=0,binding=1) uniform sampler2D tex;
+layout(set=0,binding=0) uniform Params { mat4 mvp; vec4 tint; } p;
+void main(){ color = texture(tex, uv) * p.tint; }
+```
+
+```bash
+shaderflux translate textured.frag --to hlsl --hlsl-model 50
+```
+
+HLSL comes out. This is real output from the current version, with the register bindings and the matrix qualifier already handled:
+
+```hlsl
+cbuffer Params : register(b0)
+{
+    row_major float4x4 p_mvp : packoffset(c0);
+    float4 p_tint : packoffset(c4);
+};
+
+Texture2D<float4> tex : register(t1);
+SamplerState _tex_sampler : register(s1);
+...
+void frag_main()
+{
+    color = tex.Sample(_tex_sampler, uv) * p_tint;
+}
+```
+
+Note `row_major`: the GLSL matrix was column-major, and the translation flips the qualifier so the memory layout stays identical. This is exactly the kind of detail that silently breaks ports when done by hand.
+
+Errors are reported with file and line, and a non-zero exit code:
+
+```text
+$ shaderflux translate broken.frag --to hlsl
+broken.frag:3: error: 'undefined_thing' : undeclared identifier
+translation failed
+```
+
 ## What you get
 
 **The end result:** one command-line tool, `shaderflux`, that takes a shader and gives you back a PC-ready version plus a report you can trust.
@@ -37,6 +82,19 @@ ShaderFlux-AI automates the mechanical steps, uses the LLM for the judgment call
 - *People learning graphics programming* see exactly what changed between APIs and why.
 - *Anyone porting a project* spends less time on the repetitive 80% (conversion, bindings, validation) and more on the 20% that needs human judgment.
 - *Everyone* can trust the output more, because it is checked by real compilers and every change is a diff you can read.
+
+## How it compares
+
+Good shader translators already exist, and ShaderFlux-AI builds on them rather than replacing them:
+
+| Project | What it is |
+| --- | --- |
+| [ShaderConductor](https://github.com/Microsoft/ShaderConductor) | Glues DXC and SPIRV-Cross to cross-compile HLSL |
+| [SDL_shadercross](https://docsearch.algolia.com/mcp/docs/repo/libsdl-org/sdl_shadercross) | Library and CLI for converting between shader formats |
+| [Naga](https://kvark.github.io/naga/shader/2022/02/17/shader-translation-benchmark.html) / Tint | Rust and Google translators used in WebGPU stacks |
+| [CrossTL](https://github.com/CrossGL/crosstl) | Translator built on its own intermediate language |
+
+ShaderFlux-AI uses the same standard compilers underneath. The goal is to add what a translator alone does not give you: **checks for porting traps** (bindings, matrix conventions, intrinsics), **explanations and small fixes** when conversion fails, and **a clear statement of what was and was not verified**. Several of these are still planned; see the roadmap.
 
 ## How it works
 
@@ -136,6 +194,17 @@ When LLM features are on, shader source and compiler output are sent to the Anth
 - [ ] Experimental: render pipeline analysis
 
 The full breakdown, with acceptance criteria, is in [docs/PLAN.md](docs/PLAN.md).
+
+## Help wanted
+
+The most useful things you can do right now:
+
+- **Try it on a real shader and tell us what breaks.** Use the "Porting problem" issue template. A minimal failing shader is gold.
+- **Verify the HLSL path.** HLSL input needs a real DXC to confirm; if you have the Vulkan SDK installed, run `pytest -m needs_tools` and report the result.
+- **Contribute small test shaders** (your own code only; no console SDK or NDA material). See `CONTRIBUTING.md`.
+- **Review the [plan](docs/PLAN.md).** Disagreements and missing pitfalls are welcome.
+
+If the project is useful to you, a star helps other graphics developers find it.
 
 ## Contributing
 
