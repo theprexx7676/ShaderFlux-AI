@@ -134,7 +134,9 @@ examples/
 
 Goal: reliable, testable access to the compilers and validators, with clear errors when they are missing.
 
-**Phase 2 progress:** the runner, discovery, `doctor`, backend interfaces, glslang/glslc, SPIRV-Cross and SPIRV-Tools backends are implemented and tested against the real tools (Ubuntu packages). The DXC backend is implemented but **unverified**, because `dxc` could not be installed in the development environment. Real-tool findings are in `docs/tools.md`.
+**Phase 2 progress (updated):** the DXC backend is now exercised against a real DXC 1.9 in CI (job `dxc-tests`, Linux release), and that run found a real bug (the SPIRV-Cross default of Shader Model 3 HLSL, now fixed). Locally no `dxc` is available, so the DXC tests skip there.
+
+**Phase 2 progress (earlier):** the runner, discovery, `doctor`, backend interfaces, glslang/glslc, SPIRV-Cross and SPIRV-Tools backends are implemented and tested against the real tools (Ubuntu packages). The DXC backend is implemented but **unverified**, because `dxc` could not be installed in the development environment. Real-tool findings are in `docs/tools.md`.
 
 ### 2.1 Tool inventory and acquisition
 - [x] 2.1.1 List tools to support: `dxc`, `spirv-cross`, `spirv-val`, `spirv-opt`, `spirv-dis`, `spirv-as`, `glslangValidator` and/or `glslc`. Optional later: `slangc`, `naga`, `tint`.
@@ -172,12 +174,12 @@ Goal: reliable, testable access to the compilers and validators, with clear erro
 - **Acceptance:** a fake backend can be registered in tests and used by the pipeline.
 
 ### 2.5 DXC backend
-- [ ] 2.5.1 HLSL to DXIL compile (for "does this compile for D3D12" checks). *(Implemented (`check_dxil`) but UNVERIFIED: no real `dxc` was available.)*
-- [ ] 2.5.2 HLSL to SPIR-V compile with `-spirv` and a configurable target environment (for example Vulkan 1.2). **VERIFY** flag names with `dxc --help`. *(Implemented but UNVERIFIED against real `dxc`; flag spellings marked VERIFY in the code.)*
+- [x] 2.5.1 HLSL to DXIL compile (for "does this compile for D3D12" checks). *(Verified against DXC 1.9 in CI (job `dxc-tests`, `tests/integration/test_dxc.py`): HLSL compiles to DXIL.)*
+- [x] 2.5.2 HLSL to SPIR-V compile with `-spirv` and a configurable target environment (for example Vulkan 1.2). **VERIFY** flag names with `dxc --help`. *(Verified against DXC 1.9 in CI (job `dxc-tests`, `tests/integration/test_dxc.py`): HLSL compiles to valid SPIR-V.)*
 - [x] 2.5.3 Pass entry point, stage profile (`vs_6_x`, `ps_6_x`, `cs_6_x`...), defines, include dirs.
-- [ ] 2.5.4 Map binding options (`-fvk-b-shift`, `-fvk-t-shift`, `-fvk-s-shift`, `-fvk-u-shift`, `-fvk-bind-register`) from our own `BindingPolicy` model. **VERIFY** exact syntax and the note that shift and bind-register options cannot be combined. *(Implemented (`BindingPolicy`) but UNVERIFIED; exact `-fvk-*` argument forms must be checked against `dxc --help`.)*
+- [x] 2.5.4 Map binding options (`-fvk-b-shift`, `-fvk-t-shift`, `-fvk-s-shift`, `-fvk-u-shift`, `-fvk-bind-register`) from our own `BindingPolicy` model. **VERIFY** exact syntax and the note that shift and bind-register options cannot be combined. *(Verified against DXC 1.9 in CI (job `dxc-tests`, `tests/integration/test_dxc.py`): the shift flags are accepted, and the proposed flags really separate the bindings (`docs/pain-points.md`).)*
 - [ ] 2.5.5 Support `[[vk::binding]]` attribute inspection (read, not rewrite) for later analysis. *(Moved to 4.2.1 (source analysis).)*
-- [ ] 2.5.6 Parse DXC diagnostics (file, line, column, severity, message) into `Diagnostic`. *(Implemented from the clang-style format; UNVERIFIED against real dxc output.)*
+- [x] 2.5.6 Parse DXC diagnostics (file, line, column, severity, message) into `Diagnostic`. *(Verified against DXC 1.9 in CI (job `dxc-tests`, `tests/integration/test_dxc.py`): a compile error is reported with file, line and column.)*
 - [ ] 2.5.7 Golden tests: five tiny shaders (vertex passthrough, textured pixel, constant buffer, compute with UAV, one that fails to compile). *(Not done: needs real `dxc`. Corpus shaders and `tests/integration/test_dxc.py` are ready and skip until it is installed.)*
 - **Acceptance:** each golden shader compiles or fails as expected, with parsed diagnostics.
 
@@ -296,13 +298,13 @@ Goal: understand a shader well enough to catch porting problems before and after
 - [x] 4.2.1 Parse HLSL `register(...)` and `[[vk::binding]]` from source (conservative parser, report "could not parse" rather than guessing). *(`register(...)` and `[[vk::binding]]` are parsed; unparsed constructs are skipped silently, not reported yet.)*
 - [ ] 4.2.2 Build a `BindingMap` from source registers to target set/binding. *(Not done as a model: the default and shifted slots are computed inside `find_collisions`.)*
 - [x] 4.2.3 Detect collisions (two resources mapped to the same slot) and gaps.
-- [ ] 4.2.4 Detect register-type mixing (`b`, `t`, `s`, `u`) that DXC maps onto one binding number space by default. **VERIFY** the default behaviour with an experiment (DXC docs say the register type is ignored, which can cause overlap). *(Documented by DXC's guide (see docs/pain-points.md) but not yet confirmed with an experiment on a real `dxc`.)*
+- [x] 4.2.4 Detect register-type mixing (`b`, `t`, `s`, `u`) that DXC maps onto one binding number space by default. **VERIFY** the default behaviour with an experiment (DXC docs say the register type is ignored, which can cause overlap). *(Verified against DXC 1.9 in CI (job `dxc-tests`, `tests/integration/test_dxc.py`): by default DXC puts resources of different register types on the same binding.)*
 - [x] 4.2.5 Provide a `BindingPolicy` (shift per register type, explicit overrides) and a function that proposes one automatically.
 - [ ] 4.2.6 Emit a human-readable binding table in the report. *(Not done: findings name the colliding resources and the fix; a full table waits for the report phase.)*
 - **Acceptance:** a shader with overlapping `b0`/`t0` is flagged, and the proposed policy removes the overlap.
 
 ### 4.3 Matrix and convention analysis
-- [ ] 4.3.1 **Research spike with experiments.** Write tiny HLSL and GLSL shaders and inspect the reflected offsets and the generated code to build a verified table covering: storage order in constant buffers, `row_major`/`column_major` qualifiers, `#pragma pack_matrix`, how DXC and SPIRV-Cross treat matrix dimensions (an HLSL `float2x3` versus a GLSL `mat2x3`), and `mul` argument order. Output: `docs/matrix-conventions.md` with evidence for every row. *(Partial: the GLSL / SPIRV-Cross side is done in docs/matrix-conventions.md; the DXC side needs a real `dxc`.)*
+- [ ] 4.3.1 **Research spike with experiments.** Write tiny HLSL and GLSL shaders and inspect the reflected offsets and the generated code to build a verified table covering: storage order in constant buffers, `row_major`/`column_major` qualifiers, `#pragma pack_matrix`, how DXC and SPIRV-Cross treat matrix dimensions (an HLSL `float2x3` versus a GLSL `mat2x3`), and `mul` argument order. Output: `docs/matrix-conventions.md` with evidence for every row. *(Mostly done: GLSL/SPIRV-Cross side and DXC 1.9 side are in `docs/matrix-conventions.md`. Still open: `#pragma pack_matrix`, `-fvk-use-gl-layout`, other DXC versions and Windows DXC.)*
 - [x] 4.3.2 Define lint rules from that table, for example: `mul` used with a vector on the left versus right, matrix declared without an explicit qualifier in a shared buffer, matrix constructed from rows or columns, use of `transpose` near uploads.
 - [x] 4.3.3 Implement a token-based detector first (fast, no AST). Move to an AST only if the experiments show false positives or negatives that need it (see 4.5).
 - [x] 4.3.4 Each finding carries: rule ID, location, explanation, suggested fix, and confidence.

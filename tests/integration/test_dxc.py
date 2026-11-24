@@ -120,3 +120,39 @@ def test_dxc_is_found_and_its_version_is_parsed() -> None:
     (status,) = report.tools
     assert status.state is ToolState.OK, status
     assert status.version, "the version regex did not match `dxc --version`"
+
+
+def test_matrix_packing_defaults_and_the_fix_we_suggest(tmp_path: Path) -> None:
+    """MAT002: an unqualified matrix packs like column_major, and #pragma pack_matrix flips it.
+
+    Observed with DXC 1.9: reflection marks the SPIR-V RowMajor decoration on HLSL
+    column-major members (the qualifier flips between the languages), identical offsets.
+    """
+    from shaderflux.analysis.reflection import parse_reflection
+    from shaderflux.tools.spirv_cross import SpirvCrossBackend
+
+    require_tool("dxc", "spirv-cross")
+    body = (
+        "cbuffer U : register(b0) { float4x4 plain; row_major float4x4 rowm;"
+        " column_major float4x4 colm; };\n"
+        "float4 main(float4 p : POSITION) : SV_Position"
+        " { return mul(p, plain) + mul(p, rowm) + mul(p, colm); }\n"
+    )
+
+    def members(text: str) -> dict[str, tuple[bool, int | None]]:
+        source = ShaderSource(text=text, language=ShaderLanguage.HLSL, stage=ShaderStage.VERTEX)
+        compiled = DxcBackend.discover().compile(source, target=SPIRV)
+        assert compiled.ok, compiled.diagnostics
+        assert compiled.output is not None
+        reflected = SpirvCrossBackend.discover().reflect(compiled.output)
+        block = parse_reflection(reflected.text).find("type.U") or parse_reflection(
+            reflected.text
+        ).find("U")
+        assert block is not None
+        return {m.name: (m.row_major, m.offset) for m in block.members}
+
+    default = members(body)
+    assert default["plain"][0] == default["colm"][0] != default["rowm"][0]
+    pragma = members("#pragma pack_matrix(row_major)\n" + body)
+    assert pragma["plain"][0] == pragma["rowm"][0] != pragma["colm"][0]
+    assert [v[1] for v in default.values()] == [v[1] for v in pragma.values()] == [0, 64, 128]

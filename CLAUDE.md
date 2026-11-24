@@ -73,9 +73,7 @@ Tool binaries live on `PATH` (apt: spirv-tools, glslang-tools, spirv-cross, glsl
 
 ## Known gaps (keep these honest in README and PLAN)
 
-- The DXC backend (`tools/dxc.py`) and HLSL translation are **unverified against a real
-  `dxc`**; flag spellings are marked VERIFY. Tests in `tests/integration/test_dxc.py`
-  skip until `dxc` exists.
+- The DXC backend (`tools/dxc.py`) is exercised against a real **DXC 1.9 (Linux)** only in CI (job `dxc-tests`, downloaded from Microsoft's release); locally `dxc` is usually missing and those tests skip. Verified there: flag syntax, the default binding collision and the proposed fix, HLSL to GLSL, version parsing, matrix packing defaults. **Not** verified: Windows DXC, other DXC versions, `#pragma pack_matrix`, `-fvk-use-gl-layout`. `scripts/dxc_experiments.py` prints facts about DXC for the docs.
 - Lint rules are heuristic (token based). Their 100% score on `tests/corpus/lint/` is a
   regression guard written by the same author, not independent evidence.
 - CI was green on pull request #1 at the last check (lint, unit tests on Ubuntu, macOS and Windows with Python 3.11 to 3.13). Always look at the latest run rather than trusting this line; it took three pushes to get green the first time, because CI found things local runs could not (see "Lessons"). Windows skips about 77 POSIX-only tests, so Windows coverage is thinner. An `integration-tests` job (Ubuntu only) installs the apt tools and runs the `needs_tools` tests; there is no `dxc` in CI, so the DXC tests skip. An `action-smoke` job runs `action.yml` itself on this repository's shaders (clean passes, collision fails, globs and SARIF checked); the `upload-sarif` step is skipped there and has never run.

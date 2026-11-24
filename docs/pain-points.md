@@ -21,6 +21,10 @@ Sources: [DXC SPIR-V guide](https://github.com/microsoft/DirectXShaderCompiler/b
 *Tool:* rule `BND001` finds the collision and prints the exact shift flags that
 remove it, checked collision-free before it is shown.
 
+*Verified:* with DXC 1.9 (CI job `dxc-tests`), the default mapping puts the b0, t0, s0 and u0
+resources of `tests/corpus/hlsl/collision.hlsl` on set 0 binding 0, and the printed flags
+separate them into bindings 0 to 4. Only the Linux DXC release was exercised.
+
 ## 2. Matrices end up transposed
 
 Storage order, math convention and the argument order of `mul` are three separate

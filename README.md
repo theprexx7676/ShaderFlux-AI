@@ -4,7 +4,7 @@
 
 ShaderFlux-AI helps developers who are porting a game or graphics project to PC and are stuck on the shader step. It wraps the standard open-source shader compilers and uses an LLM (Claude) for the parts those tools cannot do: fixing convention mismatches, mapping bindings, replacing missing intrinsics and explaining compiler errors.
 
-> **Status: early development (v0.0.1, not released).** Working today: `shaderflux lint` and `explain` for HLSL and GLSL (binding collisions, matrix-convention traps, intrinsic differences), translation of GLSL input to HLSL, GLSL or SPIR-V with SPIR-V validation and a re-check of the generated code, run reports (`--report`), `doctor`, `config show` and a GitHub Action. **Not yet proven:** HLSL *translation* has never run against a real DXC, `translate --repair` (Claude proposes small fixes, the real compiler checks them) has never run against the live API, and the Action's upload-to-code-scanning step has never been exercised. **Not built:** reflection and image comparison, batch mode, a `fix` command. See the [roadmap](#roadmap) and the [detailed plan](docs/PLAN.md).
+> **Status: early development (v0.0.1, not released).** Working today: `shaderflux lint` and `explain` for HLSL and GLSL (binding collisions, matrix-convention traps, intrinsic differences), translation of GLSL input to HLSL, GLSL or SPIR-V with SPIR-V validation and a re-check of the generated code, run reports (`--report`), `doctor`, `config show` and a GitHub Action. **Not yet proven:** HLSL *translation* has been checked against DXC 1.9 on Linux in CI only (Windows DXC and other versions are untested), `translate --repair` (Claude proposes small fixes, the real compiler checks them) has never run against the live API, and the Action's upload-to-code-scanning step has never been exercised. **Not built:** reflection and image comparison, batch mode, a `fix` command. See the [roadmap](#roadmap) and the [detailed plan](docs/PLAN.md).
 
 ## Who is this for?
 
@@ -142,8 +142,8 @@ The LLM never has the last word: a fix is kept only if the real compiler accepts
 
 | Feature | Status |
 | --- | --- |
-| Translation between HLSL, GLSL, SPIR-V and MSL | GLSL input works and is tested with real tools. HLSL input is implemented but **unverified** (needs DXC). MSL output is implemented but untested |
-| Binding collision check and fix flags | Works (the printed DXC flags still need confirming against a real DXC) |
+| Translation between HLSL, GLSL, SPIR-V and MSL | GLSL input works and is tested with real tools. HLSL input works against DXC 1.9 on Linux in CI; other DXC versions and Windows are untested. MSL output is implemented but untested |
+| Binding collision check and fix flags | Works; the printed DXC flags are confirmed against DXC 1.9 in CI |
 | Matrix-convention and intrinsic checks | Work; heuristic, each finding has a confidence level |
 | `explain` for every rule | Works |
 | Output re-check and run reports | Work for GLSL output; HLSL output is re-checked only if DXC is installed |
@@ -256,7 +256,7 @@ Only `translate --repair` talks to the network: when a shader fails to compile i
 
 - [x] Project idea and scope
 - [x] Foundation: repository layout, tooling, packaging (CI green on Linux, macOS and Windows with Python 3.11 to 3.13)
-- [ ] Deterministic conversion pipeline with compiler wrappers (done for GLSL input; HLSL needs DXC verification)
+- [x] Deterministic conversion pipeline with compiler wrappers (GLSL input everywhere; HLSL input checked against DXC 1.9 on Linux in CI)
 - [x] Analysis: reflection, binding collisions, matrix and intrinsic checks, `lint` and `explain` (DXC-side verification pending)
 - [x] LLM repair loop with compiler verification (offline-tested; live API not yet exercised)
 - [x] Output re-check, verdicts and run reports

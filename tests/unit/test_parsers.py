@@ -123,3 +123,20 @@ def test_display_name_cannot_become_a_compiler_option(path: str, expected: str) 
     source = ShaderSource(path=Path(path), text="", language=ShaderLanguage.GLSL)
     assert display_name(source, "shader.frag") == expected
     assert not display_name(source, "shader.frag").startswith("-")
+
+
+def test_hlsl_output_defaults_to_shader_model_5_not_the_legacy_default() -> None:
+    """Regression: without --shader-model SPIRV-Cross emits SM3 HLSL that DXC rejects."""
+    from pathlib import Path
+
+    from shaderflux.core.models import ShaderLanguage, Target
+    from shaderflux.tools.spirv_cross import CrossOptions, SpirvCrossBackend
+
+    backend = SpirvCrossBackend(Path("spirv-cross"))
+    hlsl = Target(language=ShaderLanguage.HLSL)
+    args = backend.build_args(hlsl, CrossOptions())
+    assert args[args.index("--shader-model") + 1] == "50"
+    explicit = backend.build_args(
+        Target(language=ShaderLanguage.HLSL, version="60"), CrossOptions()
+    )
+    assert explicit[explicit.index("--shader-model") + 1] == "60"

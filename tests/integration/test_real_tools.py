@@ -222,3 +222,15 @@ def test_file_named_like_an_option_still_compiles(tmp_path: Path, corpus: Path) 
     )
     result = backend.compile(source, target=VULKAN)
     assert result.ok, result.diagnostics
+
+
+def test_default_hlsl_is_modern_not_shader_model_3(corpus: Path) -> None:
+    """Regression found by DXC in CI: the default output used sampler2D / tex2D / COLOR0."""
+    require_tool("spirv-cross")
+    spirv = compile_textured(corpus)
+    result = SpirvCrossBackend.discover().convert(spirv, Target(language=ShaderLanguage.HLSL))
+    assert result.ok, result.diagnostics
+    assert "Texture2D" in result.text
+    assert "tex2D" not in result.text
+    assert "sampler2D" not in result.text
+    assert "COLOR0" not in result.text

@@ -22,6 +22,9 @@ _STAGE_NAME = {
 }
 _GLSL_VERSION = re.compile(r"^\d{3}$")
 _HLSL_MODEL = re.compile(r"^\d{2}$")
+# Without --shader-model SPIRV-Cross writes Shader Model 3 HLSL (sampler2D, tex2D, COLOR0), which
+# DXC rejects. Found by running the generated code through a real DXC in CI.
+DEFAULT_HLSL_SHADER_MODEL = "50"
 _MSL_VERSION = re.compile(r"^\d{5,6}$")
 _ERROR_LINE = re.compile(
     r"^(?:(?P<sev>ERROR|WARNING):\s*|SPIRV-Cross threw an exception:\s*)(?P<msg>.*)$"
@@ -86,12 +89,10 @@ class SpirvCrossBackend:
                 args.append("--vulkan-semantics")
         elif target.language is ShaderLanguage.HLSL:
             args.append("--hlsl")
-            if target.version is not None:
-                if not _HLSL_MODEL.match(target.version):
-                    raise InvalidInputError(
-                        f"invalid HLSL shader model {target.version!r} (e.g. 50 or 60)"
-                    )
-                args += ["--shader-model", target.version]
+            model = target.version or DEFAULT_HLSL_SHADER_MODEL
+            if not _HLSL_MODEL.match(model):
+                raise InvalidInputError(f"invalid HLSL shader model {model!r} (e.g. 50 or 60)")
+            args += ["--shader-model", model]
         elif target.language is ShaderLanguage.MSL:
             args.append("--msl")
             if target.version is not None:

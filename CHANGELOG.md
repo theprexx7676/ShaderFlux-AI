@@ -6,6 +6,10 @@ and the project aims to follow [Semantic Versioning](https://semver.org/) once r
 
 ## [Unreleased]
 
+### Fixed (found by running a real DXC in CI)
+- Translating to HLSL without `--hlsl-model` produced Shader Model 3 HLSL (`sampler2D`, `tex2D`), which DXC rejects. The default is now Shader Model 5.0.
+- A new `dxc-tests` CI job downloads DXC and exercises the HLSL path; it confirmed the binding-collision rule and its fix flags, and settled that DXC packs unqualified matrices column-major.
+
 ### Changed (structure)
 - The code is a one-way stack of packages, checked by a test: `core` < `source`, `tools` < `verify`, `analysis` < `pipeline` < `llm` < `reporting` < `workflows` < `cli`. The documented layering had been wrong.
 - New `source` package (inputs, includes, glob patterns) so `analysis` no longer depends on `pipeline`.

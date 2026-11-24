@@ -85,7 +85,9 @@ def translate_command(
     out: Path | None = typer.Option(None, "--out", "-o", help="Write the result to this file."),
     force: bool = typer.Option(False, "--force", help="Overwrite --out if it exists."),
     glsl_version: str | None = typer.Option(None, "--glsl-version", help="For glsl, e.g. 450."),
-    shader_model: str | None = typer.Option(None, "--hlsl-model", help="For hlsl, e.g. 50 or 60."),
+    shader_model: str | None = typer.Option(
+        None, "--hlsl-model", help="For hlsl, e.g. 50 or 60 (default 50)."
+    ),
     msl_version: str | None = typer.Option(None, "--msl-version", help="For msl, e.g. 20100."),
     vulkan: bool = typer.Option(False, "--vulkan", help="Emit Vulkan-style GLSL."),
     environment: str | None = typer.Option(None, "--env", help="SPIR-V env, e.g. vulkan1.2."),

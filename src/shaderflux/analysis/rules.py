@@ -35,8 +35,9 @@ _BASE: tuple[RuleInfo, ...] = (
         "Give each register type its own range with -fvk-b-shift / -fvk-t-shift / -fvk-s-shift / "
         "-fvk-u-shift (shaderflux prints the exact flags), or pin each resource with "
         "[[vk::binding(binding, set)]].",
-        "Documented by DXC's SPIR-V guide; the generated flags are still to be checked against a "
-        "real dxc (plan task 4.2.4).",
+        "Documented by DXC's SPIR-V guide and confirmed with DXC 1.9 in CI: by default these "
+        "resources land on one binding, and the printed flags separate them "
+        "(tests/integration/test_dxc.py).",
         (_DXC_DOC,),
     ),
     RuleInfo(
@@ -88,8 +89,9 @@ _BASE: tuple[RuleInfo, ...] = (
         "row_major matrix with identical memory offsets.",
         "Write row_major or column_major on the matrix (or use #pragma pack_matrix) so the layout "
         "is stated in the source.",
-        "Qualifier flipping verified with real SPIRV-Cross; behaviour of real DXC on defaults "
-        "still to be verified.",
+        "Verified with real tools: SPIRV-Cross flips the qualifier between GLSL and HLSL, and with "
+        "DXC 1.9 an unqualified matrix is packed like column_major while -Zpr makes it row_major "
+        "(docs/matrix-conventions.md).",
         (_SLANG_MATRIX,),
     ),
     RuleInfo(
