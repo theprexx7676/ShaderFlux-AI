@@ -170,7 +170,7 @@ If the optional LLM is used, it never has the last word: a fix is kept only if t
 | Matrix-convention and intrinsic checks | Work; heuristic, each finding has a confidence level |
 | `explain` for every rule | Works |
 | Output re-check and run reports | Work for GLSL output; HLSL output is re-checked only if DXC is installed |
-| `fix`: binding attributes and matrix layout (HLSL) | Works, no AI; unit-tested and re-linted; the DXC compile check runs in CI only |
+| `fix`: binding attributes and matrix layout (HLSL) | Works, no AI; unit-tested, re-linted, and confirmed against DXC 1.9 on Linux in CI (other DXC versions and Windows untested) |
 | Optional AI-assisted compile-error repair (`--repair`, your own key) | **Experimental.** Built, tested with a scripted model, **never run against the live API** |
 | Reflection and image comparison | Planned |
 | Batch and permutations | Planned |
