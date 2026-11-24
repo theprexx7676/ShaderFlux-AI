@@ -62,5 +62,5 @@ jobs:
           python-version: "3.12"
       - run: uv pip install -e ".[dev]"
       - run: python -m shaderflux doctor
-        continue-on-error: true  # dxc is expected to be missing; this just logs what was found
+        continue-on-error: true  # dxc is expected to be missing (exit 1); this just logs the tool versions
       - run: python -m pytest -m "needs_tools and not needs_llm and not needs_gpu" -rs
