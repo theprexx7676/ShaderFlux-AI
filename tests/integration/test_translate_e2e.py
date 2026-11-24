@@ -120,3 +120,43 @@ def test_cache_with_real_tools(corpus: Path, tmp_path: Path) -> None:
     assert first.ok
     assert second.cached
     assert second.output_text == first.output_text
+
+
+def test_repair_loop_with_real_compiler_and_scripted_model(corpus: Path) -> None:
+    """The model is scripted; the compiler, validator and converter are real."""
+    import json
+
+    from shaderflux.llm.provider import FakeProvider
+    from shaderflux.llm.repair import repair_and_translate
+
+    need_glsl_chain()
+    fix = json.dumps(
+        {
+            "summary": "use a literal instead of the undeclared name",
+            "edits": [
+                {
+                    "file": "broken.frag",
+                    "start_line": 3,
+                    "end_line": 3,
+                    "expected": "void main() { color = vec4(undefined_thing); }",
+                    "replacement": "void main() { color = vec4(1.0); }",
+                    "reason": "undefined_thing is not declared anywhere",
+                }
+            ],
+            "confidence": "high",
+        }
+    )
+    provider = FakeProvider([fix])
+    outcome = repair_and_translate(
+        load_source(corpus / "glsl" / "broken.frag"),
+        Target(language=ShaderLanguage.HLSL),
+        registry=default_registry(),
+        provider=provider,
+    )
+    assert outcome.ok, outcome.stop_reason
+    assert outcome.translation.output_text
+    assert "vec4(1.0)" in outcome.source.text
+    assert "undefined_thing" not in outcome.source.text
+    assert "undefined_thing" in (corpus / "glsl" / "broken.frag").read_text()  # input untouched
+    sent = provider.requests[0].user
+    assert "broken.frag:3: error" in sent  # the real glslc/glslang diagnostic reached the prompt

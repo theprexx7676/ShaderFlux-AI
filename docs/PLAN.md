@@ -333,56 +333,58 @@ The original README promised AST analysis. Evaluate before committing.
 
 Goal: a safe, testable, cost-aware way to ask Claude for help.
 
+**Phase 5 and 6 progress:** the provider interface, the Anthropic provider, schemas, versioned prompts, context building, the safe patch applier, the repair loop and `translate --repair` exist, with 60+ offline tests using a scripted fake model against fake and real compilers. **The live API path has not been exercised** (no API key here), so prompt quality, real-model success rates and the exact fallback behaviour are unknown. Task 6.3.2 to 6.3.5 (binding, convention, intrinsic and explain tasks) are not built.
+
 ### 5.1 Provider interface
-- [ ] 5.1.1 Define `LlmProvider` protocol: `complete(request) -> LlmResponse` with token usage and stop reason.
-- [ ] 5.1.2 Implement `AnthropicProvider` using the official SDK.
-- [ ] 5.1.3 Implement `FakeProvider` that replays recorded responses from fixture files, used in all unit tests.
-- [ ] 5.1.4 Record-and-replay tool: run once against the real API, save request/response pairs, replay in CI with no network.
-- [ ] 5.1.5 Retries with backoff for transient errors, no retry for auth or invalid-request errors.
-- [ ] 5.1.6 Timeouts and a per-run cost/token ceiling that aborts cleanly.
+- [x] 5.1.1 Define `LlmProvider` protocol: `complete(request) -> LlmResponse` with token usage and stop reason.
+- [ ] 5.1.2 Implement `AnthropicProvider` using the official SDK. *(Implemented in `llm/anthropic_provider.py` and tested with a fake client for request shape and error mapping, but **never run against the live API** (no key in the development environment).)*
+- [x] 5.1.3 Implement `FakeProvider` that replays recorded responses from fixture files, used in all unit tests.
+- [ ] 5.1.4 Record-and-replay tool: run once against the real API, save request/response pairs, replay in CI with no network. *(Not done.)*
+- [x] 5.1.5 Retries with backoff for transient errors, no retry for auth or invalid-request errors. *(Done by relying on the SDK's built-in retry (2 retries on 408/409/429/5xx); not separately tested.)*
+- [ ] 5.1.6 Timeouts and a per-run cost/token ceiling that aborts cleanly. *(Partial: a per-run token ceiling exists (`max_total_tokens`); the timeout is the SDK default.)*
 - **Acceptance:** the repair loop (Phase 6) runs fully offline in CI with the fake provider.
 
 ### 5.2 Model configuration
-- [ ] 5.2.1 Model name is a config value, not hardcoded in logic. Look up current model IDs in the official docs at implementation time.
-- [ ] 5.2.2 Allow separate models for cheap tasks (explanations, classification) and hard tasks (repairs).
-- [ ] 5.2.3 Record model name and parameters in every report.
+- [x] 5.2.1 Model name is a config value, not hardcoded in logic. Look up current model IDs in the official docs at implementation time.
+- [ ] 5.2.2 Allow separate models for cheap tasks (explanations, classification) and hard tasks (repairs). *(Not done.)*
+- [ ] 5.2.3 Record model name and parameters in every report. *(Not done: the model name is returned by the provider but not recorded in a report yet.)*
 - **Acceptance:** changing the model requires only a config change.
 
 ### 5.3 Structured output
-- [ ] 5.3.1 **VERIFY** the current official structured-output or strict tool-use mechanism and its limits in Anthropic's docs.
-- [ ] 5.3.2 Define response schemas: `PatchProposal` (list of edits with file, range, replacement, reason), `Explanation`, `BindingSuggestion`.
-- [ ] 5.3.3 Validate every response with Pydantic. On schema failure, retry once with the validation error, then fail cleanly.
-- [ ] 5.3.4 Never execute or interpret free text from the model as commands.
+- [x] 5.3.1 **VERIFY** the current official structured-output or strict tool-use mechanism and its limits in Anthropic's docs.
+- [ ] 5.3.2 Define response schemas: `PatchProposal` (list of edits with file, range, replacement, reason), `Explanation`, `BindingSuggestion`. *(Partial: `PatchProposal` exists; `Explanation` and `BindingSuggestion` do not.)*
+- [x] 5.3.3 Validate every response with Pydantic. On schema failure, retry once with the validation error, then fail cleanly.
+- [x] 5.3.4 Never execute or interpret free text from the model as commands.
 - **Acceptance:** malformed fixture responses are rejected in tests.
 
 ### 5.4 Prompt design
-- [ ] 5.4.1 Store prompts as versioned template files in `src/shaderflux/llm/prompts/`, not inline strings.
-- [ ] 5.4.2 One prompt per task: repair compile error, fix binding layout, fix convention finding, explain a diff.
-- [ ] 5.4.3 Each prompt states: the task, the source and target languages and versions, the exact diagnostics, the rules ("change as little as possible", "do not rename public symbols", "output edits only").
-- [ ] 5.4.4 Include small, verified few-shot examples taken from the corpus.
-- [ ] 5.4.5 Treat shader source as data: delimit it clearly and instruct the model to ignore any instructions embedded in comments or strings. Add tests with adversarial comments.
-- [ ] 5.4.6 Prompt version number is recorded in reports.
+- [x] 5.4.1 Store prompts as versioned template files in `src/shaderflux/llm/prompts/`, not inline strings.
+- [ ] 5.4.2 One prompt per task: repair compile error, fix binding layout, fix convention finding, explain a diff. *(Partial: only the compile-error repair prompt exists.)*
+- [x] 5.4.3 Each prompt states: the task, the source and target languages and versions, the exact diagnostics, the rules ("change as little as possible", "do not rename public symbols", "output edits only").
+- [ ] 5.4.4 Include small, verified few-shot examples taken from the corpus. *(Not done.)*
+- [x] 5.4.5 Treat shader source as data: delimit it clearly and instruct the model to ignore any instructions embedded in comments or strings. Add tests with adversarial comments.
+- [x] 5.4.6 Prompt version number is recorded in reports.
 - **Acceptance:** prompt changes are reviewed like code and covered by replay tests.
 
 ### 5.5 Context management
-- [ ] 5.5.1 Estimate tokens before sending. Use the SDK's token counting if available.
-- [ ] 5.5.2 Build the smallest sufficient context: the failing file, the included files it actually uses, the diagnostics, the relevant reflection summary.
-- [ ] 5.5.3 When over budget, truncate by dropping unused includes and function bodies unrelated to the error lines, and say so in the prompt.
-- [ ] 5.5.4 Use prompt caching for large stable prefixes (instructions, examples). **VERIFY** current caching semantics in the official docs.
+- [ ] 5.5.1 Estimate tokens before sending. Use the SDK's token counting if available. *(Not done: the size budget is in characters, not tokens.)*
+- [x] 5.5.2 Build the smallest sufficient context: the failing file, the included files it actually uses, the diagnostics, the relevant reflection summary.
+- [x] 5.5.3 When over budget, truncate by dropping unused includes and function bodies unrelated to the error lines, and say so in the prompt.
+- [ ] 5.5.4 Use prompt caching for large stable prefixes (instructions, examples). **VERIFY** current caching semantics in the official docs. *(Not done.)*
 - **Acceptance:** a 5-file shader project fits a configured budget and the log shows what was trimmed.
 
 ### 5.6 Privacy and safety controls
-- [ ] 5.6.1 LLM features are off unless `--llm` or config enables them and a key exists.
-- [ ] 5.6.2 `--dry-run` prints exactly what would be sent, without sending.
-- [ ] 5.6.3 Optional redaction hooks (strip comments, replace string literals) before sending.
-- [ ] 5.6.4 Never send environment variables, absolute paths, or files outside the shader's include graph.
-- [ ] 5.6.5 Document data handling in `docs/privacy.md`.
+- [x] 5.6.1 LLM features are off unless `--llm` or config enables them and a key exists.
+- [x] 5.6.2 `--dry-run` prints exactly what would be sent, without sending.
+- [ ] 5.6.3 Optional redaction hooks (strip comments, replace string literals) before sending. *(Not done.)*
+- [x] 5.6.4 Never send environment variables, absolute paths, or files outside the shader's include graph.
+- [x] 5.6.5 Document data handling in `docs/privacy.md`.
 - **Acceptance:** a test asserts that a file outside the include graph never appears in a request.
 
 ### 5.7 Cost and usage reporting
-- [ ] 5.7.1 Track input/output tokens per call and total per run.
-- [ ] 5.7.2 Estimate cost from a configurable price table (do not hardcode prices as facts).
-- [ ] 5.7.3 Show usage at the end of each run and in the report.
+- [ ] 5.7.1 Track input/output tokens per call and total per run. *(Partial: tokens are counted and shown; cache tokens are read but not summarised.)*
+- [ ] 5.7.2 Estimate cost from a configurable price table (do not hardcode prices as facts). *(Not done.)*
+- [ ] 5.7.3 Show usage at the end of each run and in the report. *(Partial: shown in the CLI after a repair; not in a report file yet.)*
 - **Acceptance:** the totals in the report match the sum of recorded calls.
 
 ---
@@ -392,24 +394,24 @@ Goal: a safe, testable, cost-aware way to ask Claude for help.
 Goal: use the LLM to fix what the tools cannot, with strict guardrails.
 
 ### 6.1 Patch format and application
-- [ ] 6.1.1 Represent edits as line-range replacements with expected original text, so stale edits are detected.
-- [ ] 6.1.2 Apply patches to a copy, never to the original file in place.
-- [ ] 6.1.3 Reject patches that touch lines outside the allowed files.
-- [ ] 6.1.4 Reject patches larger than a configurable fraction of the file unless `--allow-large-edits`.
-- [ ] 6.1.5 Produce a unified diff for the report.
+- [x] 6.1.1 Represent edits as line-range replacements with expected original text, so stale edits are detected.
+- [x] 6.1.2 Apply patches to a copy, never to the original file in place.
+- [x] 6.1.3 Reject patches that touch lines outside the allowed files.
+- [x] 6.1.4 Reject patches larger than a configurable fraction of the file unless `--allow-large-edits`.
+- [x] 6.1.5 Produce a unified diff for the report.
 - **Acceptance:** overlapping, stale and out-of-range patches are rejected in tests.
 
 ### 6.2 Repair loop
-- [ ] 6.2.1 Loop: run pipeline, collect diagnostics, ask LLM for a patch, apply, re-run. Stop on success, on attempt cap, on no progress, or on budget.
-- [ ] 6.2.2 "No progress" detection: same diagnostics (after normalising line numbers) twice in a row, or an oscillation between two states.
-- [ ] 6.2.3 Keep every attempt's source, diagnostics and diff for the report.
-- [ ] 6.2.4 Prefer fixing the first error and re-compiling over fixing everything at once, since later errors are often caused by the first.
-- [ ] 6.2.5 Never accept a patch that makes the number of errors increase, unless it is the only change available (flag it).
+- [x] 6.2.1 Loop: run pipeline, collect diagnostics, ask LLM for a patch, apply, re-run. Stop on success, on attempt cap, on no progress, or on budget.
+- [x] 6.2.2 "No progress" detection: same diagnostics (after normalising line numbers) twice in a row, or an oscillation between two states.
+- [ ] 6.2.3 Keep every attempt's source, diagnostics and diff for the report. *(Attempts are kept in memory and printed; they are not written to a report file yet.)*
+- [x] 6.2.4 Prefer fixing the first error and re-compiling over fixing everything at once, since later errors are often caused by the first.
+- [x] 6.2.5 Never accept a patch that makes the number of errors increase, unless it is the only change available (flag it).
 - **Acceptance:** with the fake provider, a scripted three-step repair converges and a scripted loop is stopped by the cap.
 
 ### 6.3 Targeted tasks
 Each task is a prompt + a verifier.
-- [ ] 6.3.1 **Compile error repair.** Input: source, diagnostics. Verifier: the compiler.
+- [ ] 6.3.1 **Compile error repair.** Input: source, diagnostics. Verifier: the compiler. *(Implemented and tested with a scripted model and the real compilers; **not yet run against the live model**.)*
 - [ ] 6.3.2 **Binding remap.** Input: source, binding table, collisions. Verifier: reflection shows no collisions and expected set/binding.
 - [ ] 6.3.3 **Convention fix.** Input: a lint finding from 4.3. Verifier: re-run the lint rule plus the numeric test in 7.4 where possible.
 - [ ] 6.3.4 **Missing intrinsic replacement.** Input: the intrinsic entry from 4.4. Verifier: compile, plus numeric test where possible.
@@ -417,9 +419,9 @@ Each task is a prompt + a verifier.
 - **Acceptance:** each task has at least three corpus cases with replayable fixtures.
 
 ### 6.4 `translate` with repair (milestone M3)
-- [ ] 6.4.1 `shaderflux translate` runs the deterministic path first and uses the repair loop only on failure or lint findings the user opted into.
-- [ ] 6.4.2 `shaderflux fix file --log compiler.log` starts from a user-supplied log, for people who already ran their own compiler.
-- [ ] 6.4.3 Both commands end with a report (Phase 8).
+- [x] 6.4.1 `shaderflux translate` runs the deterministic path first and uses the repair loop only on failure or lint findings the user opted into.
+- [ ] 6.4.2 `shaderflux fix file --log compiler.log` starts from a user-supplied log, for people who already ran their own compiler. *(Not done: no `fix` command yet.)*
+- [ ] 6.4.3 Both commands end with a report (Phase 8). *(Not done: reports are phase 8.)*
 - **Acceptance:** at least 70% of the "needs repair" corpus cases converge with the real model (target to be revisited after the first measurement, see Phase 10).
 
 ---

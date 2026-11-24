@@ -4,7 +4,7 @@
 
 ShaderFlux-AI helps developers who are porting a game or graphics project to PC and are stuck on the shader step. It wraps the standard open-source shader compilers and uses an LLM (Claude) for the parts those tools cannot do: fixing convention mismatches, mapping bindings, replacing missing intrinsics and explaining compiler errors.
 
-> **Status: early development.** Working today: `shaderflux lint` and `explain` for HLSL and GLSL (binding collisions, matrix-convention traps, intrinsic differences), translation of GLSL input to HLSL, GLSL or SPIR-V with validation, `doctor` and `config show`. HLSL *translation* is implemented but **not yet verified against a real DXC**. The LLM features, verification beyond SPIR-V validation, reports and batch mode are **planned, not built**. See the [roadmap](#roadmap) and the [detailed plan](docs/PLAN.md).
+> **Status: early development.** Working today: `shaderflux lint` and `explain` for HLSL and GLSL (binding collisions, matrix-convention traps, intrinsic differences), translation of GLSL input to HLSL, GLSL or SPIR-V with validation, `doctor` and `config show`. HLSL *translation* is implemented but **not yet verified against a real DXC**. `translate --repair` (Claude proposes small fixes to compile errors, the real compiler checks them) is built and tested offline but **has not yet run against the live API**. Verification beyond SPIR-V validation, reports and batch mode are **planned, not built**. See the [roadmap](#roadmap) and the [detailed plan](docs/PLAN.md).
 
 ## Who is this for?
 
@@ -179,12 +179,19 @@ shaderflux config show
 
 Exit codes: `0` success, `1` the translation failed (for example a compile error), `2` bad input or a missing tool, `3` a tool failed while running.
 
-Planned, not built yet:
+AI-assisted repair (needs `ANTHROPIC_API_KEY`; sends your shader, see [docs/privacy.md](docs/privacy.md)):
 
 ```bash
-# Fix a shader using a compiler log
-shaderflux fix broken.frag --log compiler.log
+# See exactly what would be sent, and send nothing
+shaderflux translate broken.frag --to hlsl --repair --dry-run
+
+# Try to fix a compile error with Claude, review the diff, save the corrected source
+shaderflux translate broken.frag --to hlsl --repair --write-fixed broken.fixed.frag
 ```
+
+The model only proposes line edits. The tool rejects stale or oversized edits, never touches your file, and keeps a fix only if the real compiler accepts it.
+
+Planned, not built yet: `shaderflux fix` from a compiler log.
 
 ## Requirements
 
@@ -194,7 +201,7 @@ shaderflux fix broken.frag --log compiler.log
 
 ## Privacy
 
-When LLM features are on, shader source and compiler output are sent to the Anthropic API. Do not use them on code you are not allowed to share. Offline mode keeps everything on your machine. Nothing is sent without a configured API key.
+Only `translate --repair` talks to the network: when a shader fails to compile it sends that shader, the files it includes and the compiler errors to the Anthropic API. Use `--dry-run` to see exactly what, and read [docs/privacy.md](docs/privacy.md). Everything else (lint, explain, translate without `--repair`) runs entirely on your machine.
 
 ## Scope and limitations
 
@@ -209,7 +216,7 @@ When LLM features are on, shader source and compiler output are sent to the Anth
 - [x] Foundation: repository layout, tooling, packaging (CI configured, not yet observed running)
 - [ ] Deterministic conversion pipeline with compiler wrappers (done for GLSL input; HLSL needs DXC verification)
 - [x] Analysis: reflection, binding collisions, matrix and intrinsic checks, `lint` and `explain` (DXC-side verification pending)
-- [ ] LLM repair loop with verification
+- [x] LLM repair loop with compiler verification (offline-tested; live API not yet exercised)
 - [ ] Command-line tool and first release
 - [ ] Test corpus and benchmarks
 - [ ] Batch and permutation support

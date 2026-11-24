@@ -23,7 +23,7 @@ Tool binaries live on `PATH` (apt: spirv-tools, glslang-tools, spirv-cross, glsl
 `src/shaderflux/`: `cli` (Typer commands), `core` (models, config, errors),
 `tools` (the only code that spawns processes, via `tools/runner.py`), `pipeline`
 (includes, routes, cache, translate), `analysis` (reflection, bindings, lint
-rules), `llm` / `verify` / `reporting` (still empty).
+rules), `llm` (provider, prompts, patches, repair loop), `verify` / `reporting` (still empty).
 Dependency direction: `cli -> pipeline -> analysis/tools -> core`.
 
 ## Rules for working on this repo
@@ -37,7 +37,7 @@ Dependency direction: `cli -> pipeline -> analysis/tools -> core`.
    (see `check_define_name`, `check_spirv_env`).
 4. **No proprietary or NDA-covered shader code** (console SDKs) in code, tests, prompts
    or docs. Corpus shaders must be original or permissively licensed.
-5. API keys are read only from `ANTHROPIC_API_KEY`; config files containing one are
+5. For Claude API code, load the `claude-api` skill first and follow current model IDs and parameter rules. API keys are read only from `ANTHROPIC_API_KEY`; config files containing one are
    rejected. Never log or store a key.
 6. Lint rules must carry a confidence level and a concrete fix, and each needs a
    positive and a negative test. New false positives become new corpus cases in
@@ -64,4 +64,5 @@ Dependency direction: `cli -> pipeline -> analysis/tools -> core`.
 - Lint rules are heuristic (token based). Their 100% score on `tests/corpus/lint/` is a
   regression guard written by the same author, not independent evidence.
 - CI has not been observed running (needs a pull request or a push to `main`).
-- Phases 5 onward (LLM layer, verification, reports, batch) are not built.
+- The LLM layer (`llm/`, `translate --repair`) is tested only with a scripted fake model. It has **never run against the live API** (no key was available), so real prompt quality and success rates are unknown. The Anthropic request uses `output_config` (effort and JSON schema), no `thinking`/sampling parameters (current models reject them), and tries server-side refusal fallbacks first, retrying without them if rejected.
+- Verification beyond SPIR-V validation, reports, batch mode and the `fix` command are not built.
