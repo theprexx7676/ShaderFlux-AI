@@ -127,6 +127,21 @@ def prepare_repair_prompt(
     )
 
 
+def repair_blocker(translation: TranslationResult) -> str | None:
+    """Why this failure cannot be repaired by the model, or ``None`` when it can.
+
+    Only compile errors are repairable. A missing tool, a failed conversion or a failed
+    validation is not something the model can fix, and nothing is sent for it.
+    """
+    failing = translation.stages[-1].name if translation.stages else ""
+    if failing.startswith("compile"):
+        return None
+    return (
+        f"the failure is in '{failing}', not a compile error; "
+        "only compile errors can be repaired automatically"
+    )
+
+
 def repair_and_translate(
     source: ShaderSource,
     target: Target,
@@ -156,12 +171,9 @@ def repair_and_translate(
 
     for number in range(1, options.max_attempts + 1):
         errors = _errors(translation)
-        failing = translation.stages[-1].name if translation.stages else ""
-        if not failing.startswith("compile"):
-            result.stop_reason = (
-                f"the failure is in '{failing}', not a compile error; only compile errors "
-                "can be repaired automatically"
-            )
+        blocker = repair_blocker(translation)
+        if blocker is not None:
+            result.stop_reason = blocker
             break
         if (
             options.max_total_tokens is not None

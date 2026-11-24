@@ -76,3 +76,19 @@ def test_help_lists_every_option() -> None:
     text = ANSI.sub("", result.output)
     for flag in ("--to", "--from", "--stage", "--out", "--force", "--roundtrip", "--json"):
         assert flag in text
+
+
+def test_dry_run_says_nothing_would_be_sent_when_the_failure_is_not_a_compile_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from shaderflux.tools.registry import BackendRegistry
+
+    monkeypatch.setattr(
+        "shaderflux.workflows.translate_file.default_registry", lambda **_kw: BackendRegistry()
+    )
+    shader = tmp_path / "a.frag"
+    shader.write_text("#version 450\nvoid main() {}\n")
+    result = runner.invoke(app, ["translate", str(shader), "--to", "hlsl", "--repair", "--dry-run"])
+    assert result.exit_code == 1
+    assert "nothing would be sent" in result.output
+    assert "DRY RUN" not in result.output

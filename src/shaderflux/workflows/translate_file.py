@@ -26,6 +26,7 @@ from shaderflux.llm.repair import (
     RepairResult,
     prepare_repair_prompt,
     repair_and_translate,
+    repair_blocker,
 )
 from shaderflux.llm.schemas import PATCH_SCHEMA
 from shaderflux.pipeline.cache import TranslationCache
@@ -88,6 +89,7 @@ class TranslateOutcome:
     repair: RepairResult | None = None
     dry_run: DryRun | None = None
     nothing_to_repair: bool = False
+    not_repairable: str | None = None  # dry run: why nothing would be sent
     report_path: Path | None = None
     fixed_path: Path | None = None
 
@@ -190,6 +192,9 @@ def run_translate(
         result = translate(source, target, registry=registry, options=options)
         if result.ok:
             return TranslateOutcome(source, target, result, nothing_to_repair=True)
+        blocker = repair_blocker(result)
+        if blocker is not None:
+            return TranslateOutcome(source, target, result, not_repairable=blocker)
         return TranslateOutcome(source, target, result, dry_run=_dry_run(source, target, result))
 
     if request.repair:

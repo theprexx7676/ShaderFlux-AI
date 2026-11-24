@@ -162,5 +162,9 @@ jobs:
           code=$?
           echo "exit code: $code"
           [ "$code" -eq 2 ]
-      - name: --repair --dry-run still works
-        run: shaderflux translate tests/corpus/glsl/broken.frag --to hlsl --repair --dry-run
+      - name: --repair --dry-run still works (it needs a compiler to find the error)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y glslang-tools spirv-cross
+          shaderflux translate tests/corpus/glsl/broken.frag --to hlsl --repair --dry-run 2>&1 | tee dry.txt
+          grep -q "DRY RUN" dry.txt

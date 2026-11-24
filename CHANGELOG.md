@@ -9,6 +9,9 @@ and the project aims to follow [Semantic Versioning](https://semver.org/) once r
 ### Changed (works without any API)
 - The project no longer leans on an LLM: everything useful runs with no API key, account or network. The AI repair (`translate --repair`) is documented and labelled as optional and experimental, uses only the user's own key, and has never run against the live API.
 
+### Fixed (found in review of a CI log)
+- `translate --repair --dry-run` built a prompt and said "this is exactly what would be sent" even when the failure was a missing tool, where a real `--repair` sends nothing. It now says `nothing would be sent: ...` (exit 1) using the same rule as the real repair loop.
+
 ### Changed (lighter install)
 - The Anthropic SDK is now an optional extra (`pip install "shaderflux[ai]"`) and is imported only when `--repair` actually runs. A plain install is 14 packages (25 with the extra, measured from the built wheel). Without the extra, `translate --repair` says how to install it and exits 2 before doing any work; `--repair --dry-run`, `lint`, `fix`, `init` and `translate` are unaffected. A new CI job (`lean-install`) installs the package with no extras and checks this.
 

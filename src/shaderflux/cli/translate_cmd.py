@@ -180,6 +180,11 @@ def translate_command(
     if outcome.nothing_to_repair:
         eprint("nothing to repair: the shader translated without errors")
         raise typer.Exit(code=EXIT_OK)
+    if outcome.not_repairable is not None:
+        for diagnostic in outcome.result.diagnostics:
+            eprint(diagnostic.format())
+        eprint(f"nothing would be sent: {outcome.not_repairable}")
+        raise typer.Exit(code=EXIT_FAILED)
     if outcome.dry_run is not None:
         eprint(
             "DRY RUN: this is exactly what would be sent to the Anthropic API. Nothing was sent."

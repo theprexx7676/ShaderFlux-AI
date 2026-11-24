@@ -7,6 +7,8 @@ to compile. It is off by default and needs the optional `ai` extra
 
 ## What is sent
 
+`--dry-run` mirrors the real run: if the failure is not a compile error (for example a missing tool), nothing would be sent and it says so.
+
 When `--repair` is given and the shader does not compile, the following goes to the
 Anthropic API:
 

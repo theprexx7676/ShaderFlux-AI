@@ -180,3 +180,29 @@ def test_a_bad_request_never_reaches_the_model(tmp_path: Path) -> None:
             provider=provider,
         )
     assert provider.requests == []
+
+
+def test_dry_run_shows_nothing_when_the_failure_is_a_missing_tool(tmp_path: Path) -> None:
+    """A missing compiler is not a shader error: a real --repair sends nothing, so --dry-run
+    must not claim that it would send a prompt."""
+    from shaderflux.tools.registry import BackendRegistry
+
+    source = tmp_path / "a.frag"
+    source.write_text(GOOD)
+    provider = FakeProvider([])
+    request = TranslateRequest(
+        input_file=source, target_language=ShaderLanguage.HLSL, repair=True, dry_run=True
+    )
+    dry = run_translate(request, registry=BackendRegistry(), provider=provider)
+    assert dry.dry_run is None
+    assert dry.not_repairable is not None
+    assert "not a compile error" in dry.not_repairable
+
+    real = run_translate(
+        TranslateRequest(input_file=source, target_language=ShaderLanguage.HLSL, repair=True),
+        registry=BackendRegistry(),
+        provider=provider,
+    )
+    assert provider.requests == []  # the real run agrees: nothing is sent
+    assert real.repair is not None
+    assert real.repair.stop_reason == dry.not_repairable
