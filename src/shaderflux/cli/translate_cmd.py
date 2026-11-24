@@ -1,4 +1,4 @@
-"""``shaderflux translate``."""
+"""``shaderflux translate``: options in, output out. The work is in ``workflows``."""
 
 from __future__ import annotations
 
@@ -7,31 +7,19 @@ from pathlib import Path
 import platformdirs
 import typer
 
-from shaderflux.analysis.lint import lint_file
 from shaderflux.cli.errors import EXIT_FAILED, EXIT_OK, EXIT_TOOL, eprint, handle_errors
 from shaderflux.core.config import load_settings
-from shaderflux.core.errors import InvalidInputError, ShaderFluxError
+from shaderflux.core.errors import InvalidInputError
 from shaderflux.core.logging import setup_logging
-from shaderflux.core.models import Severity, ShaderLanguage, Target, TranslationResult
-from shaderflux.llm.anthropic_provider import AnthropicProvider
-from shaderflux.llm.prompts_loader import prompt_version
-from shaderflux.llm.provider import DEFAULT_MODEL, LlmRequest
-from shaderflux.llm.repair import (
-    Outcome,
-    RepairOptions,
-    RepairResult,
-    describe,
-    prepare_repair_prompt,
-    repair_and_translate,
+from shaderflux.core.models import ShaderLanguage
+from shaderflux.llm.repair import describe
+from shaderflux.source.inputs import parse_language_name, parse_stage_name
+from shaderflux.workflows.translate_file import (
+    TranslateOutcome,
+    TranslateRequest,
+    check_request,
+    run_translate,
 )
-from shaderflux.llm.schemas import PATCH_SCHEMA
-from shaderflux.pipeline.cache import TranslationCache
-from shaderflux.pipeline.output import write_output
-from shaderflux.pipeline.translate import TranslateOptions, translate
-from shaderflux.reporting.report import build_report, write_report
-from shaderflux.source.inputs import load_source, parse_language_name, parse_stage_name
-from shaderflux.tools.base import CrossOptions
-from shaderflux.tools.registry import default_registry
 
 
 def parse_define(raw: str) -> tuple[str, str | None]:
@@ -42,40 +30,47 @@ def parse_define(raw: str) -> tuple[str, str | None]:
     return name, (value if sep else None)
 
 
-def _preflight(
+def _check_flag_combinations(
     *,
     repair: bool,
     dry_run: bool,
     write_fixed: Path | None,
     allow_large_edits: bool,
     max_attempts: int | None,
-    out: Path | None,
-    force: bool,
-    report: Path | None,
 ) -> None:
-    """Reject bad option combinations and unwritable outputs *before* any work or LLM spend."""
-    if not repair:
-        stray = [
-            flag
-            for flag, given in (
-                ("--dry-run", dry_run),
-                ("--write-fixed", write_fixed is not None),
-                ("--allow-large-edits", allow_large_edits),
-                ("--max-attempts", max_attempts is not None),
-            )
-            if given
-        ]
-        if stray:
-            raise InvalidInputError(f"{', '.join(stray)} only make sense together with --repair")
-    for flag, path in (("--out", out), ("--write-fixed", write_fixed)):
-        if path is None:
-            continue
-        if path.is_dir():
-            raise InvalidInputError(f"{flag} {path} is a directory; give a file name")
-        if path.exists() and not force:
-            raise InvalidInputError(f"{path} already exists (use --force to overwrite)")
-    if report is not None and report.is_dir():
-        raise InvalidInputError(f"--report {report} is a directory; give a file name")
+    """Repair-only flags given without --repair are an error, not a silent no-op."""
+    if repair:
+        return
+    stray = [
+        flag
+        for flag, given in (
+            ("--dry-run", dry_run),
+            ("--write-fixed", write_fixed is not None),
+            ("--allow-large-edits", allow_large_edits),
+            ("--max-attempts", max_attempts is not None),
+        )
+        if given
+    ]
+    if stray:
+        raise InvalidInputError(f"{', '.join(stray)} only make sense together with --repair")
+
+
+def _print_outcome(outcome: TranslateOutcome, *, out: Path | None, quiet: bool) -> None:
+    result, repair = outcome.result, outcome.repair
+    if repair is not None and repair.attempts:
+        eprint(describe(repair))
+        if repair.changed:
+            eprint("AI-assisted change (review it before using the shader):")
+            eprint(repair.diff)
+    for diagnostic in result.diagnostics:
+        eprint(diagnostic.format())
+    if not result.ok:
+        eprint("translation failed")
+    elif out is not None:
+        if not quiet:
+            eprint(f"wrote {out}" + (" (from cache)" if result.cached else ""))
+    elif result.output_text is not None:
+        typer.echo(result.output_text, nl=not result.output_text.endswith("\n"))
 
 
 @handle_errors
@@ -124,145 +119,79 @@ def translate_command(
 ) -> None:
     """Translate a shader to another language using the deterministic tool chain."""
     setup_logging(verbose=verbose, quiet=quiet)
-    _preflight(
+    _check_flag_combinations(
         repair=repair,
         dry_run=dry_run,
         write_fixed=write_fixed,
         allow_large_edits=allow_large_edits,
         max_attempts=max_attempts,
-        out=out,
-        force=force,
-        report=report,
     )
     settings = load_settings().settings
 
     target_language = parse_language_name(to)
-    version = {
-        ShaderLanguage.GLSL: glsl_version,
-        ShaderLanguage.HLSL: shader_model,
-        ShaderLanguage.MSL: msl_version,
-    }.get(target_language)
-    target = Target(
-        language=target_language,
-        version=version,
+    request = TranslateRequest(
+        input_file=input_file,
+        target_language=target_language,
+        target_version={
+            ShaderLanguage.GLSL: glsl_version,
+            ShaderLanguage.HLSL: shader_model,
+            ShaderLanguage.MSL: msl_version,
+        }.get(target_language),
         environment=environment or settings.default_environment,
-    )
-
-    defines = dict(parse_define(item) for item in define)
-    source = load_source(
-        input_file,
-        language=parse_language_name(from_) if from_ else None,
+        source_language=parse_language_name(from_) if from_ else None,
         stage=parse_stage_name(stage) if stage else None,
         entry_point=entry,
-        defines=defines,
+        defines=dict(parse_define(item) for item in define),
         include_dirs=[*settings.include_dirs, *include],
-    )
-
-    cache_dir = settings.cache_dir or Path(platformdirs.user_cache_dir("shaderflux"))
-    options = TranslateOptions(
+        tool_paths=settings.tools,
         roundtrip=roundtrip,
         validate=validate,
         recheck=recheck,
-        cross=CrossOptions(vulkan_semantics=vulkan),
-        cache=TranslationCache(cache_dir) if cache or settings.cache_dir else None,
+        vulkan_semantics=vulkan,
+        cache_dir=(settings.cache_dir or Path(platformdirs.user_cache_dir("shaderflux")))
+        if cache or settings.cache_dir
+        else None,
+        out=out,
+        force=force,
+        report=report,
+        repair=repair,
+        dry_run=dry_run,
+        max_attempts=max_attempts or settings.llm.max_attempts,
+        allow_large_edits=allow_large_edits,
+        write_fixed=write_fixed,
+        model=settings.llm.model,
     )
-    registry = default_registry(configured=settings.tools)
+    check_request(request)  # fail on bad paths before doing any work or spending anything
+    if target_language is ShaderLanguage.SPIRV and out is None and not json_output:
+        raise InvalidInputError("binary output needs --out FILE")
+    if repair and not dry_run and not quiet:
+        eprint(
+            "note: if the shader does not compile, its source and the compiler errors "
+            "will be sent to the Anthropic API (use --dry-run to preview)"
+        )
 
-    outcome: RepairResult | None = None
-    if repair and dry_run:
-        result = translate(source, target, registry=registry, options=options)
-        if result.ok:
-            eprint("nothing to repair: the shader translated without errors")
-            raise typer.Exit(code=EXIT_OK)
-        errors = [d for d in result.diagnostics if d.severity is Severity.ERROR]
-        tool = (
-            result.stages[-1].tool.name if result.stages and result.stages[-1].tool else "unknown"
-        )
-        prompt = prepare_repair_prompt(source, target, errors, tool=tool)
-        request = LlmRequest(
-            task="repair_compile_error",
-            system=prompt.system,
-            user=prompt.user,
-            schema=PATCH_SCHEMA,
-            prompt_version=prompt_version("system", "repair_compile_error"),
-        )
+    outcome = run_translate(request)
+
+    if outcome.nothing_to_repair:
+        eprint("nothing to repair: the shader translated without errors")
+        raise typer.Exit(code=EXIT_OK)
+    if outcome.dry_run is not None:
         eprint(
             "DRY RUN: this is exactly what would be sent to the Anthropic API. Nothing was sent."
         )
-        eprint(f"files included: {', '.join(prompt.files_sent)}")
-        for note in prompt.notes:
+        eprint(f"files included: {', '.join(outcome.dry_run.files_sent)}")
+        for note in outcome.dry_run.notes:
             eprint(f"note: {note}")
-        typer.echo(request.describe())
+        typer.echo(outcome.dry_run.request.describe())
         raise typer.Exit(code=EXIT_OK)
-    if repair:
-        provider = AnthropicProvider(model=settings.llm.model or DEFAULT_MODEL)
-        if not quiet:
-            eprint(
-                "note: if the shader does not compile, its source and the compiler errors "
-                "will be sent to the Anthropic API (use --dry-run to preview)"
-            )
-        outcome = repair_and_translate(
-            source,
-            target,
-            registry=registry,
-            provider=provider,
-            options=RepairOptions(
-                max_attempts=max_attempts or settings.llm.max_attempts,
-                allow_large_edits=allow_large_edits,
-                translate=options,
-            ),
-        )
-        result = outcome.translation
-    else:
-        result = translate(source, target, registry=registry, options=options)
 
-    if out is not None and result.ok:
-        result.output_path = write_output(result, out, force=force)
-    if report is not None:
-        findings = None
-        if source.path is not None and source.language in (
-            ShaderLanguage.HLSL,
-            ShaderLanguage.GLSL,
-        ):
-            try:
-                findings = lint_file(
-                    source.path, language=source.language, include_dirs=source.include_dirs
-                ).findings
-            except ShaderFluxError:
-                findings = None
-        write_report(
-            build_report(source, target, result, repair=outcome, findings=findings), report
-        )
-        if not quiet and not json_output:
-            eprint(f"report written to {report}")
-    if write_fixed is not None and outcome is not None and outcome.ok and outcome.changed:
-        fixed = TranslationResult(ok=True, output_text=outcome.source.text)
-        write_output(fixed, write_fixed, force=force)
-
+    if outcome.report_path is not None and not quiet and not json_output:
+        eprint(f"report written to {outcome.report_path}")
     if json_output:
-        typer.echo(result.model_dump_json(indent=2))
+        typer.echo(outcome.result.model_dump_json(indent=2))
     else:
-        if outcome is not None and outcome.attempts:
-            eprint(describe(outcome))
-            if outcome.changed:
-                eprint("AI-assisted change (review it before using the shader):")
-                eprint(outcome.diff)
-        for diagnostic in result.diagnostics:
-            eprint(diagnostic.format())
-        if not result.ok:
-            eprint("translation failed")
-        elif out is not None:
-            if not quiet:
-                eprint(f"wrote {out}" + (" (from cache)" if result.cached else ""))
-        elif result.output_text is not None:
-            typer.echo(result.output_text, nl=not result.output_text.endswith("\n"))
-        else:
-            raise InvalidInputError("binary output needs --out FILE")
+        _print_outcome(outcome, out=out, quiet=quiet)
 
-    if (
-        not result.ok
-        and outcome is not None
-        and any(a.outcome is Outcome.LLM_ERROR for a in outcome.attempts)
-    ):
+    if outcome.model_call_failed:
         raise typer.Exit(code=EXIT_TOOL)
-    raise typer.Exit(code=EXIT_OK if result.ok else EXIT_FAILED)
+    raise typer.Exit(code=EXIT_OK if outcome.result.ok else EXIT_FAILED)

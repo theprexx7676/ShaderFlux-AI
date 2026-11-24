@@ -8,11 +8,11 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-from shaderflux.cli import translate_cmd
 from shaderflux.cli.app import app
 from shaderflux.cli.errors import EXIT_TOOL
 from shaderflux.core.errors import LlmError
 from shaderflux.llm.provider import FakeProvider
+from shaderflux.workflows import translate_file
 from tests.conftest import require_tool
 
 pytestmark = [pytest.mark.integration, pytest.mark.needs_tools]
@@ -43,7 +43,7 @@ def _tools() -> None:
 
 
 def use_provider(monkeypatch: pytest.MonkeyPatch, provider: FakeProvider) -> None:
-    monkeypatch.setattr(translate_cmd, "AnthropicProvider", lambda **_: provider)
+    monkeypatch.setattr(translate_file, "AnthropicProvider", lambda **_: provider)
 
 
 def test_repair_fixes_prints_the_diff_and_saves_the_fixed_source(

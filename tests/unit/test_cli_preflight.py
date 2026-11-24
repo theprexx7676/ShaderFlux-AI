@@ -7,10 +7,10 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-from shaderflux.cli import translate_cmd
 from shaderflux.cli.app import app
 from shaderflux.cli.errors import EXIT_USAGE
 from shaderflux.llm.provider import FakeProvider
+from shaderflux.workflows import translate_file
 
 pytestmark = pytest.mark.unit
 
@@ -46,7 +46,7 @@ def test_existing_output_is_refused_before_any_model_call(
     shader: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     provider = FakeProvider([])
-    monkeypatch.setattr(translate_cmd, "AnthropicProvider", lambda **_: provider)
+    monkeypatch.setattr(translate_file, "AnthropicProvider", lambda **_: provider)
     out = tmp_path / "out.hlsl"
     out.write_text("precious")
     for extra in (["--out", str(out)], ["--write-fixed", str(out)]):
