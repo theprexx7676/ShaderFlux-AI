@@ -34,7 +34,7 @@ shaderflux fix  'shaders/**/*.hlsl'      # preview the mechanical fixes as a dif
 shaderflux fix  'shaders/**/*.hlsl' --write
 ```
 
-`lint`, `fix`, `explain` and `init` are pure Python: they need no compiler, no API key and no network. Install DXC, glslang and SPIRV-Cross (see [Requirements](#requirements); `shaderflux doctor` tells you what is missing) to use `translate` and `fix --verify`. A walk-through with real output is in the [10-minute tutorial](docs/tutorial-first-port.md).
+`lint`, `fix`, `explain` and `init` are pure Python: they need no compiler, no API key and no network. A plain install is 14 small packages and does not include any AI client (that is the optional `ai` extra, below). Install DXC, glslang and SPIRV-Cross (see [Requirements](#requirements); `shaderflux doctor` tells you what is missing) to use `translate` and `fix --verify`. A walk-through with real output is in the [10-minute tutorial](docs/tutorial-first-port.md).
 
 ## Who is this for?
 
@@ -287,7 +287,7 @@ Exit codes:
 | `2` | Bad input, a bad option combination, or a tool that is missing (`fix --verify` without DXC says "not verified" and exits 2) |
 | `3` | An external tool or the optional model call failed while running |
 
-**Optional and experimental**: AI-assisted repair. It needs your own `ANTHROPIC_API_KEY` (the project provides none and never pays for usage) and sends your shader, see [docs/privacy.md](docs/privacy.md):
+**Optional and experimental**: AI-assisted repair. It needs the optional extra (`pip install ".[ai]"`, which adds the Anthropic SDK) and your own `ANTHROPIC_API_KEY` (the project provides none and never pays for usage), and it sends your shader, see [docs/privacy.md](docs/privacy.md):
 
 ```bash
 # See exactly what would be sent, and send nothing
@@ -315,6 +315,21 @@ Run the lint on every pull request that touches shaders, and see the findings in
 The default `target` is `vulkan`, which also enables the checks for GLSL that Vulkan rejects; set `target: any` for shaders that stay on OpenGL.
 
 A complete workflow is in [examples/workflows/lint-shaders.yml](examples/workflows/lint-shaders.yml). The script behind the Action (`scripts/action-lint.sh`) is covered by tests, including inputs that try to inject shell commands. CI runs the Action on this repository's own shaders on every pull request: a clean shader passes, a binding collision fails the job, globs expand, and the SARIF is checked. The **upload to code scanning has not been exercised** (it needs repository permissions), and the pinned `upload-sarif@v3` should be checked against the current major version.
+
+## Use it with pre-commit
+
+Check shaders on every commit with [pre-commit](https://pre-commit.com). Add this to your `.pre-commit-config.yaml`:
+
+```yaml
+repos:
+  - repo: https://github.com/theprexx7676/ShaderFlux-AI
+    rev: main          # pin a release tag or commit once there is one
+    hooks:
+      - id: shaderflux-lint          # find porting traps in HLSL and GLSL
+      - id: shaderflux-fix-check     # fail if `shaderflux fix` would change an HLSL shader
+```
+
+Neither hook needs an API key or the network (apart from pre-commit installing the package). Header files (`.hlsli`) are not checked on their own, because bindings are decided across the files a shader includes. Both hooks were run for real with pre-commit against a clean and a failing shader.
 
 ## Use it as a Python library
 
@@ -346,7 +361,7 @@ How the code is organised, and how to add a lint rule or a tool backend, is in [
 | `translate` from HLSL, `fix --verify` | the above, plus [DXC](https://github.com/microsoft/DirectXShaderCompiler) (ships with the Vulkan SDK) |
 
   Prefer a recent SPIRV-Cross: some distribution packages are years old. Only DXC 1.9 on Linux has been exercised; Windows DXC and other versions are untested.
-- Nothing else. An Anthropic API key (`ANTHROPIC_API_KEY`, yours) is needed only for the optional, experimental `translate --repair`.
+- Nothing else. The optional, experimental `translate --repair` needs the `ai` extra (`pip install ".[ai]"`) and your own `ANTHROPIC_API_KEY`; without the extra it explains how to install it and exits with code 2 before doing any work.
 
 ## Privacy
 
@@ -381,7 +396,7 @@ The full breakdown, with acceptance criteria, is in [docs/PLAN.md](docs/PLAN.md)
 
 **Do I need an API key or an account?** No. Everything except the optional `translate --repair` runs offline, with no key and no account. The project never uses a maintainer's key, so it can never run up a bill for anyone.
 
-**Does it send my shaders anywhere?** Only if you run `translate --repair`, and `--dry-run` shows exactly what would be sent first. See [docs/privacy.md](docs/privacy.md).
+**Does it send my shaders anywhere?** Only if you install the optional `ai` extra *and* run `translate --repair`; `--dry-run` shows exactly what would be sent first. A plain install does not even contain the client. See [docs/privacy.md](docs/privacy.md).
 
 **Will it change my files?** Not unless you ask. `fix` shows a diff and writes only with `--write` or `--out`, and it only inserts text. `lint` never changes anything.
 

@@ -2,7 +2,7 @@
 
 Open-source CLI that helps people port shaders to PC. A deterministic tool chain
 (DXC, SPIRV-Cross, SPIRV-Tools, glslang) does the mechanical work, lint rules find
-known porting traps, `shaderflux fix` applies the mechanical fixes (no AI), and an optional, experimental LLM (`translate --repair`, off by default, user's own key) helps with the rest. **The project must stay fully useful with no API key**: never make a feature depend on the LLM, and never use a maintainer key. Real tools verify
+known porting traps, `shaderflux fix` applies the mechanical fixes (no AI), and an optional, experimental LLM (`translate --repair`, off by default, user's own key) helps with the rest. **The project must stay fully useful with no API key**: never make a feature depend on the LLM, and never use a maintainer key. The Anthropic SDK is an optional extra (`[ai]`) imported lazily; keep `import anthropic` out of module level (a subprocess test and the `lean-install` CI job guard this). Real tools verify
 results. Plan: `docs/PLAN.md`. Evidence for the rules: `docs/pain-points.md` and
 `docs/matrix-conventions.md`.
 

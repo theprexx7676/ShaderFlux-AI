@@ -2,7 +2,8 @@
 
 ShaderFlux-AI does most of its work locally. **Only one feature sends anything
 over the network: `shaderflux translate --repair`**, and only when a shader fails
-to compile.
+to compile. It is off by default and needs the optional `ai` extra
+(`pip install "shaderflux[ai]"`): a plain install does not contain the Anthropic SDK at all.
 
 ## What is sent
 

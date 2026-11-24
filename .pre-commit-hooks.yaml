@@ -1,0 +1,25 @@
+# Hooks for other projects that use pre-commit (https://pre-commit.com).
+# Add to your .pre-commit-config.yaml:
+#
+#   repos:
+#     - repo: https://github.com/theprexx7676/ShaderFlux-AI
+#       rev: main            # pin a release tag or commit once there is one
+#       hooks:
+#         - id: shaderflux-lint
+#         - id: shaderflux-fix-check
+#
+# Neither hook needs an API key, an account or the network (apart from installing the package).
+# Header files (.hlsli) are not checked on their own, because bindings are decided across the
+# files a shader includes; the shaders that include them are checked instead.
+- id: shaderflux-lint
+  name: ShaderFlux lint (shader porting traps)
+  description: Find known porting traps in HLSL and GLSL shaders.
+  entry: shaderflux lint
+  language: python
+  files: '\.(hlsl|fx|glsl|vert|frag|comp|geom|tesc|tese|mesh|task)$'
+- id: shaderflux-fix-check
+  name: ShaderFlux fix --check (mechanical HLSL fixes pending)
+  description: Fail if `shaderflux fix` would change an HLSL shader. Run `shaderflux fix --write` to apply.
+  entry: shaderflux fix --check
+  language: python
+  files: '\.(hlsl|fx)$'

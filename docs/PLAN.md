@@ -479,6 +479,7 @@ Goal: back every claim of success with evidence.
 ### 8.1 Commands
 - [ ] 8.1.1 `translate`: inputs, `--from`, `--to`, `--stage`, `--entry`, `-D`, `-I`, `--out`, `--force`, `--llm/--no-llm`, `--max-attempts`, `--verify-level`, `--report`.
 - [x] 4.3.7 GLSL-to-Vulkan rules `VKG001`-`VKG004` (`analysis/vulkan_glsl.py`), checked against glslangValidator 15.1.0 and 16.2.0 on a 26-snippet table. *(VERIFY: base-vertex semantics of `gl_VertexIndex`. Not done: `fix` for these rules.)*
+- [x] 13.x Optional AI extra: the SDK is `shaderflux[ai]`, imported lazily; a plain install is 14 packages; a `lean-install` CI job guards it. Pre-commit hooks (`.pre-commit-hooks.yaml`) run for real. *(Not done: publish to PyPI, so `pip install shaderflux[ai]` only works from a clone until a release exists.)*
 - [x] 8.1.2 `fix`: deterministic fixes for BND001 and MAT002 (insertions only; dry run by default; `--write`, `--out`, `--only`, `--check`). *(Changed from "shader + log": no AI needed. `--verify` recompiles with DXC and checks bindings. Not done: other rules. The real-DXC tests ran in CI against DXC 1.9 (Linux) and passed; they skip locally.)*
 - [ ] 8.1.3 `lint`: see 4.6.
 - [ ] 8.1.4 `explain`: show the report for a previous run in plain language.

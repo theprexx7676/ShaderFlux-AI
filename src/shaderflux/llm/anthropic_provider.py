@@ -7,10 +7,9 @@ with a fake client, and every API failure is mapped to :class:`LlmError`.
 
 from __future__ import annotations
 
+import importlib.util
 import logging
 from typing import Any
-
-import anthropic
 
 from shaderflux.core.errors import LlmError
 from shaderflux.llm.provider import DEFAULT_MODEL, LlmRequest, LlmResponse
@@ -18,10 +17,28 @@ from shaderflux.llm.provider import DEFAULT_MODEL, LlmRequest, LlmResponse
 log = logging.getLogger("shaderflux")
 
 _FALLBACK_BETA = "server-side-fallback-2026-07-01"
+INSTALL_HINT = (
+    "the optional AI support is not installed: run `pip install 'shaderflux[ai]'` "
+    "(it also needs your own ANTHROPIC_API_KEY)"
+)
 _NO_CREDENTIALS = (
     "no Anthropic credentials found: set the ANTHROPIC_API_KEY environment variable "
     "(or run `ant auth login`)"
 )
+
+
+def sdk_available() -> bool:
+    """True when the Anthropic SDK (the optional ``ai`` extra) is installed."""
+    return importlib.util.find_spec("anthropic") is not None
+
+
+def _sdk() -> Any:
+    """Import the SDK on first use, so that a normal install never needs it."""
+    try:
+        import anthropic
+    except ImportError as exc:
+        raise LlmError(INSTALL_HINT) from exc
+    return anthropic
 
 
 class AnthropicProvider:
@@ -50,7 +67,7 @@ class AnthropicProvider:
         self._client = client
         self.fallbacks = fallbacks
 
-    def _get_client(self) -> Any:
+    def _get_client(self, anthropic: Any) -> Any:
         if self._client is None:
             try:
                 self._client = anthropic.Anthropic()
@@ -72,7 +89,7 @@ class AnthropicProvider:
             },
         }
 
-    def _create(self, client: Any, kwargs: dict[str, Any]) -> Any:
+    def _create(self, anthropic: Any, client: Any, kwargs: dict[str, Any]) -> Any:
         if self.fallbacks:
             try:
                 return client.beta.messages.create(
@@ -83,9 +100,10 @@ class AnthropicProvider:
         return client.messages.create(**kwargs)
 
     def complete(self, request: LlmRequest) -> LlmResponse:
-        client = self._get_client()
+        anthropic = _sdk()
+        client = self._get_client(anthropic)
         try:
-            message = self._create(client, self.build_kwargs(request))
+            message = self._create(anthropic, client, self.build_kwargs(request))
         except anthropic.AuthenticationError as exc:
             raise LlmError(
                 "authentication failed: check ANTHROPIC_API_KEY (or run `ant auth login`)"

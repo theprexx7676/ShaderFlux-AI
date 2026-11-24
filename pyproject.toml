@@ -27,12 +27,14 @@ dependencies = [
   "typer>=0.12",
   "pydantic>=2.6",
   "rich>=13.7",
-  "anthropic>=0.40",
   "platformdirs>=4.2",
 ]
 
 [project.optional-dependencies]
+# Optional, experimental AI repair (`translate --repair`). You also need your own API key.
+ai = ["anthropic>=0.40"]
 dev = [
+  "anthropic>=0.40",
   "pytest>=8.0",
   "pytest-cov>=5.0",
   "ruff>=0.6",

@@ -134,3 +134,33 @@ jobs:
         run: python scripts/dxc_experiments.py
       - name: Tests against the real DXC
         run: python -m pytest -m "needs_tools and not needs_llm and not needs_gpu" -rs -v tests/integration/test_dxc.py tests/integration/test_translate_e2e.py
+
+  # A plain install must work without the optional AI support: no Anthropic SDK, and every
+  # command that does not use the model still runs. `pip install` into a clean runner Python.
+  lean-install:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install without any extra
+        run: python -m pip install .
+      - name: The AI client is not installed
+        run: python -c "import importlib.util as u, sys; sys.exit(1 if u.find_spec('anthropic') else 0)"
+      - name: Commands that need no AI work
+        run: |
+          shaderflux --version
+          shaderflux lint tests/corpus/lint/pbr_clean.hlsl
+          shaderflux explain BND001
+          shaderflux fix tests/corpus/lint/pbr_clean.hlsl --check
+          shaderflux init "$RUNNER_TEMP/project"
+      - name: --repair explains the extra and exits 2 without doing any work
+        run: |
+          set +e
+          shaderflux translate tests/corpus/glsl/passthrough.vert --to hlsl --repair
+          code=$?
+          echo "exit code: $code"
+          [ "$code" -eq 2 ]
+      - name: --repair --dry-run still works
+        run: shaderflux translate tests/corpus/glsl/broken.frag --to hlsl --repair --dry-run
