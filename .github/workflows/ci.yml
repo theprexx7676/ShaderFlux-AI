@@ -64,3 +64,41 @@ jobs:
       - run: python -m shaderflux doctor
         continue-on-error: true  # dxc is expected to be missing (exit 1); this just logs the tool versions
       - run: python -m pytest -m "needs_tools and not needs_llm and not needs_gpu" -rs
+
+  # Runs action.yml itself (not just the script it calls) on this repository's own shaders.
+  action-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: A clean shader passes
+        uses: ./
+        with:
+          paths: "tests/corpus/lint/pbr_clean.hlsl"
+          sarif-file: clean.sarif
+      - name: A shader with a binding collision fails the job
+        id: collision
+        uses: ./
+        continue-on-error: true
+        with:
+          paths: "tests/corpus/hlsl/collision.hlsl"
+          sarif-file: collision.sarif
+      - name: The previous step must have failed
+        run: test "${{ steps.collision.outcome }}" = "failure"
+      - name: Glob patterns work, and fail-on never never fails
+        uses: ./
+        with:
+          paths: "tests/corpus/hlsl/*.hlsl tests/corpus/glsl/*.vert"
+          fail-on: never
+          sarif-file: all.sarif
+      - name: The SARIF files are correct
+        run: |
+          python3 - <<'PY'
+          import json
+          clean = json.load(open("clean.sarif"))["runs"][0]["results"]
+          collision = json.load(open("collision.sarif"))["runs"][0]["results"]
+          everything = json.load(open("all.sarif"))["runs"][0]["results"]
+          assert clean == [], clean
+          assert any(r["ruleId"] == "BND001" for r in collision), collision
+          assert len(everything) > len(collision), (len(everything), len(collision))
+          print("clean:", len(clean), "collision:", len(collision), "all:", len(everything))
+          PY
