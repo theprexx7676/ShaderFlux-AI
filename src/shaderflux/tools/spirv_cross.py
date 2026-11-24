@@ -4,12 +4,18 @@ from __future__ import annotations
 
 import re
 from collections.abc import Mapping
-from dataclasses import dataclass
 from pathlib import Path
 
 from shaderflux.core.errors import InvalidInputError
 from shaderflux.core.models import Diagnostic, Severity, ShaderLanguage, ShaderStage, Target
-from shaderflux.tools.base import ToolResult, check_entry_point, finish, locate, tool_info
+from shaderflux.tools.base import (
+    CrossOptions,
+    ToolResult,
+    check_entry_point,
+    finish,
+    locate,
+    tool_info,
+)
 from shaderflux.tools.runner import run_tool, workspace
 
 _STAGE_NAME = {
@@ -26,17 +32,6 @@ _MSL_VERSION = re.compile(r"^\d{5,6}$")
 _ERROR_LINE = re.compile(
     r"^(?:(?P<sev>ERROR|WARNING):\s*|SPIRV-Cross threw an exception:\s*)(?P<msg>.*)$"
 )
-
-
-@dataclass(frozen=True)
-class CrossOptions:
-    """Optional switches for the conversion."""
-
-    vulkan_semantics: bool = False
-    es: bool = False
-    entry_point: str | None = None
-    stage: ShaderStage | None = None
-    remove_unused_variables: bool = False
 
 
 def parse_cross_diagnostics(text: str, *, tool: str = "spirv-cross") -> list[Diagnostic]:
@@ -56,6 +51,9 @@ def parse_cross_diagnostics(text: str, *, tool: str = "spirv-cross") -> list[Dia
             )
         )
     return found
+
+
+__all__ = ["CrossOptions", "SpirvCrossBackend", "parse_cross_diagnostics"]
 
 
 class SpirvCrossBackend:

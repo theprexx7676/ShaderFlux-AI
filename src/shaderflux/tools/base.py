@@ -13,6 +13,7 @@ from shaderflux.core.models import (
     Diagnostic,
     ShaderLanguage,
     ShaderSource,
+    ShaderStage,
     StageResult,
     Target,
     ToolInfo,
@@ -64,6 +65,17 @@ class ToolResult:
         )
 
 
+@dataclass(frozen=True)
+class CrossOptions:
+    """Optional switches for the conversion."""
+
+    vulkan_semantics: bool = False
+    es: bool = False
+    entry_point: str | None = None
+    stage: ShaderStage | None = None
+    remove_unused_variables: bool = False
+
+
 @runtime_checkable
 class CompilerBackend(Protocol):
     """Compiles shader source to SPIR-V."""
@@ -81,7 +93,9 @@ class CrossCompilerBackend(Protocol):
     name: str
     targets: frozenset[ShaderLanguage]
 
-    def convert(self, spirv: bytes, target: Target) -> ToolResult: ...
+    def convert(
+        self, spirv: bytes, target: Target, options: CrossOptions | None = None
+    ) -> ToolResult: ...
 
 
 @runtime_checkable

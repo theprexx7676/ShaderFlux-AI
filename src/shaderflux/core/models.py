@@ -62,7 +62,8 @@ class ShaderSource(BaseModel):
     """A shader to translate, together with everything needed to compile it."""
 
     path: Path | None = None
-    text: str
+    text: str = ""
+    binary: bytes | None = Field(default=None, repr=False, exclude=True)
     language: ShaderLanguage
     stage: ShaderStage | None = None
     entry_point: str = "main"
@@ -83,6 +84,8 @@ class ShaderSource(BaseModel):
         for part in parts:
             digest.update(part.encode("utf-8"))
             digest.update(b"\0")
+        if self.binary is not None:
+            digest.update(self.binary)
         return digest.hexdigest()
 
 
@@ -123,7 +126,10 @@ class TranslationResult(BaseModel):
 
     ok: bool
     output_text: str | None = None
+    output_bytes: bytes | None = Field(default=None, repr=False, exclude=True)
     output_path: Path | None = None
+    run_id: str | None = None
+    cached: bool = False
     stages: list[StageResult] = Field(default_factory=list)
 
     @property

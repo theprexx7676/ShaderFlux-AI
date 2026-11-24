@@ -14,3 +14,6 @@ and the project aims to follow [Semantic Versioning](https://semver.org/) once r
 - Safe subprocess runner, tool discovery and backends for glslangValidator, glslc, SPIRV-Cross and SPIRV-Tools, tested against the real tools.
 - DXC backend (unverified against a real `dxc` so far).
 - Core domain models and typed errors.
+- Configuration loading (`shaderflux.toml`, user file, environment, CLI) and `shaderflux config show`.
+- Input detection, `#include` graph with path-traversal guard, route planner, translation cache and atomic output writing.
+- `shaderflux translate` using the deterministic tool chain (no LLM). Tested end to end for GLSL input.

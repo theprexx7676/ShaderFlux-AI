@@ -4,7 +4,7 @@
 
 ShaderFlux-AI helps developers who are porting a game or graphics project to PC and are stuck on the shader step. It wraps the standard open-source shader compilers and uses an LLM (Claude) for the parts those tools cannot do: fixing convention mismatches, mapping bindings, replacing missing intrinsics and explaining compiler errors.
 
-> **Status: early planning.** The design is written down, but there is no working code yet. Everything under "Features" is planned, not shipped. See the [roadmap](#roadmap) and the [detailed plan](docs/PLAN.md).
+> **Status: early development.** The deterministic part of the pipeline works for GLSL input (translate to HLSL, GLSL or SPIR-V and validate), plus `doctor` and `config show`. HLSL input is implemented but **not yet verified against a real DXC**. The LLM features, lint rules, verification beyond SPIR-V validation, reports and batch mode are **planned, not built**. See the [roadmap](#roadmap) and the [detailed plan](docs/PLAN.md).
 
 ## Who is this for?
 
@@ -59,29 +59,42 @@ The LLM never has the last word. A translation is only reported as successful if
 | Batch and permutations | Translate a shader with many `#define` variants in one run |
 | Offline mode | Run the deterministic pipeline without sending anything to an LLM |
 
-## Planned usage
+## Usage
 
-These commands are a design sketch. They do not work yet.
+Working today (deterministic tool chain, no LLM):
 
 ```bash
-# Translate a shader
-shaderflux translate lighting.hlsl --to glsl --stage fragment
+# Check which external tools are installed
+shaderflux doctor
 
+# Translate a shader (prints to stdout, or use --out)
+shaderflux translate lighting.frag --to hlsl --hlsl-model 50
+shaderflux translate pass.vert --to spirv --out pass.spv
+
+# Defines, include directories, machine-readable result
+shaderflux translate lighting.frag --to hlsl -D TINT=0.5 -I shaders/common --json
+
+# Show the effective configuration and where each value comes from
+shaderflux config show
+```
+
+Exit codes: `0` success, `1` the translation failed (for example a compile error), `2` bad input or a missing tool, `3` a tool failed while running.
+
+Planned, not built yet:
+
+```bash
 # Fix a shader using a compiler log
 shaderflux fix broken.frag --log compiler.log
 
 # Check a shader for known porting risks without changing it
 shaderflux lint lighting.hlsl --target vulkan
-
-# Check that the required external tools are installed
-shaderflux doctor
 ```
 
-## Requirements (planned)
+## Requirements
 
 - Python 3.11 or newer.
 - External tools on your `PATH`: [DXC](https://github.com/microsoft/DirectXShaderCompiler), [SPIRV-Cross](https://github.com/KhronosGroup/SPIRV-Cross) and the [SPIRV-Tools](https://github.com/KhronosGroup/SPIRV-Tools) suite (`spirv-val`, `spirv-opt`). A glslang or glslc binary is needed for GLSL input. `shaderflux doctor` will report what is missing.
-- An Anthropic API key (`ANTHROPIC_API_KEY`) for the LLM features. It is not needed for offline mode.
+- An Anthropic API key (`ANTHROPIC_API_KEY`) for the LLM features, once they exist. It is not needed for offline mode.
 
 ## Privacy
 
@@ -97,8 +110,8 @@ When LLM features are on, shader source and compiler output are sent to the Anth
 ## Roadmap
 
 - [x] Project idea and scope
-- [ ] Foundation: repository layout, tooling, CI
-- [ ] Deterministic conversion pipeline with compiler wrappers
+- [x] Foundation: repository layout, tooling, packaging (CI configured, not yet observed running)
+- [ ] Deterministic conversion pipeline with compiler wrappers (done for GLSL input; HLSL needs DXC verification)
 - [ ] Analysis: reflection, binding map, matrix-convention checks
 - [ ] LLM repair loop with verification
 - [ ] Command-line tool and first release

@@ -5,7 +5,9 @@ from __future__ import annotations
 import typer
 
 from shaderflux import __version__
+from shaderflux.cli.config_cmd import config_app
 from shaderflux.cli.doctor import doctor_command
+from shaderflux.cli.translate_cmd import translate_command
 
 app = typer.Typer(
     name="shaderflux",
@@ -22,6 +24,8 @@ def _version_callback(value: bool) -> None:
 
 
 app.command("doctor")(doctor_command)
+app.command("translate")(translate_command)
+app.add_typer(config_app, name="config")
 
 
 @app.callback()

@@ -1,6 +1,6 @@
 # ShaderFlux-AI: Detailed Work Plan
 
-Status: **draft for review**. Nothing here is implemented yet.
+Status: **in progress.** Phases 1 and 3 are mostly implemented and Phase 2 is implemented except for verification of the DXC backend. Checked boxes (`[x]`) mean done and tested; notes in italics say what is partial or unverified.
 
 How to read this document:
 - Phases are ordered by dependency. Each task has micro-steps as checkboxes and an **Acceptance** line that says when it is done.
@@ -212,7 +212,7 @@ Goal: reliable, testable access to the compilers and validators, with clear erro
 
 Goal: translate shaders end to end with no LLM, whenever the tool chain can do it.
 
-**Phase 3 progress:** only 3.1 (domain models) is done so far; it was pulled forward because the tool layer needs it.
+**Phase 3 progress:** 3.1 to 3.6 and the `translate` command (3.7.1) are implemented. GLSL input works end to end with the real tools (GLSL to HLSL, GLSL to GLSL with `--roundtrip`, GLSL to SPIR-V). HLSL input needs `dxc`, which is **unverified** (see Phase 2). The milestone M1 acceptance ("deterministic HLSL to GLSL/SPIR-V on a 10-shader corpus") is therefore **not met yet**: the corpus has about 8 small shaders and no HLSL translation has run against a real DXC.
 
 ### 3.1 Domain models
 - [x] 3.1.1 `ShaderLanguage` enum: `hlsl`, `glsl`, `spirv`, later `msl`, `wgsl`.
@@ -225,49 +225,49 @@ Goal: translate shaders end to end with no LLM, whenever the tool chain can do i
 - **Acceptance:** models round-trip through JSON in unit tests.
 
 ### 3.2 Configuration
-- [ ] 3.2.1 Config file `shaderflux.toml` in project root, with user-level defaults from a platform config dir.
-- [ ] 3.2.2 Precedence: CLI flags, environment, project file, user file, defaults.
-- [ ] 3.2.3 Settings: tool paths, default targets, include dirs, binding policy, LLM on/off, model name, max repair attempts, cache dir, report dir.
-- [ ] 3.2.4 `shaderflux config show` prints the effective config with the source of each value.
-- [ ] 3.2.5 API key is read only from the environment (or OS keyring later), never stored in the config file.
+- [x] 3.2.1 Config file `shaderflux.toml` in project root, with user-level defaults from a platform config dir.
+- [x] 3.2.2 Precedence: CLI flags, environment, project file, user file, defaults.
+- [x] 3.2.3 Settings: tool paths, default targets, include dirs, binding policy, LLM on/off, model name, max repair attempts, cache dir, report dir. *(All listed settings exist; default targets and binding policy are not settings yet, and `tool_timeout_s`, `report_dir` and `llm.*` are not consumed until later phases.)*
+- [x] 3.2.4 `shaderflux config show` prints the effective config with the source of each value.
+- [x] 3.2.5 API key is read only from the environment (or OS keyring later), never stored in the config file.
 - **Acceptance:** precedence order covered by tests.
 
 ### 3.3 Input handling
-- [ ] 3.3.1 Detect language from extension (`.hlsl`, `.fx`, `.glsl`, `.vert`, `.frag`, `.comp`, `.spv`) with an explicit `--from` override.
-- [ ] 3.3.2 Detect stage from extension or `#pragma`/attribute hints, with `--stage` override.
-- [ ] 3.3.3 Detect entry point (HLSL: look for `[shader("...")]` or ask; default `main`).
-- [ ] 3.3.4 Handle UTF-8 with and without BOM, CRLF and LF. Reject binary input for text languages.
-- [ ] 3.3.5 Size limits with a clear error.
+- [x] 3.3.1 Detect language from extension (`.hlsl`, `.fx`, `.glsl`, `.vert`, `.frag`, `.comp`, `.spv`) with an explicit `--from` override.
+- [x] 3.3.2 Detect stage from extension or `#pragma`/attribute hints, with `--stage` override.
+- [x] 3.3.3 Detect entry point (HLSL: look for `[shader("...")]` or ask; default `main`). *(`find_entry_candidates` exists; the CLI uses `--entry` or `main` and does not prompt yet.)*
+- [x] 3.3.4 Handle UTF-8 with and without BOM, CRLF and LF. Reject binary input for text languages.
+- [x] 3.3.5 Size limits with a clear error.
 - **Acceptance:** detection table tested with at least 20 filenames and snippets.
 
 ### 3.4 Include and macro resolution
-- [ ] 3.4.1 Build an include graph for `#include "..."` and `<...>`, with search paths.
-- [ ] 3.4.2 Detect cycles and missing files with precise diagnostics.
-- [ ] 3.4.3 Produce a flattened single-file view for the LLM and a path-preserving view for compilers.
-- [ ] 3.4.4 Track `#define` inputs from CLI and config; record the effective defines in the report.
-- [ ] 3.4.5 Use the compiler's own preprocessor output where available rather than writing a custom preprocessor. Write a tiny conservative parser only for the include graph.
+- [x] 3.4.1 Build an include graph for `#include "..."` and `<...>`, with search paths.
+- [x] 3.4.2 Detect cycles and missing files with precise diagnostics.
+- [x] 3.4.3 Produce a flattened single-file view for the LLM and a path-preserving view for compilers.
+- [x] 3.4.4 Track `#define` inputs from CLI and config; record the effective defines in the report. *(Defines are part of the input hash; listing them in a report waits for phase 8.)*
+- [x] 3.4.5 Use the compiler's own preprocessor output where available rather than writing a custom preprocessor. Write a tiny conservative parser only for the include graph.
 - **Acceptance:** a three-file shader with a cycle and a missing include yields the right diagnostics.
 
 ### 3.5 Route planner
-- [ ] 3.5.1 Define the conversion graph: nodes are languages, edges are backend operations (HLSL to SPIR-V via DXC, GLSL to SPIR-V via glslang, SPIR-V to GLSL/HLSL/MSL via SPIRV-Cross).
-- [ ] 3.5.2 Find the shortest valid route between source and target, or raise `UnsupportedRoute` with a helpful message.
-- [ ] 3.5.3 For HLSL to HLSL (for example SM 5 to SM 6), route through SPIR-V only if the user asks, since round-tripping can change code shape.
-- [ ] 3.5.4 Record each hop in the result for the report.
+- [x] 3.5.1 Define the conversion graph: nodes are languages, edges are backend operations (HLSL to SPIR-V via DXC, GLSL to SPIR-V via glslang, SPIR-V to GLSL/HLSL/MSL via SPIRV-Cross).
+- [x] 3.5.2 Find the shortest valid route between source and target, or raise `UnsupportedRoute` with a helpful message.
+- [x] 3.5.3 For HLSL to HLSL (for example SM 5 to SM 6), route through SPIR-V only if the user asks, since round-tripping can change code shape.
+- [x] 3.5.4 Record each hop in the result for the report. *(Each hop appears as a named stage in the result; the planned route is also logged at debug level.)*
 - **Acceptance:** route table test for all supported pairs.
 
 ### 3.6 Orchestrator
-- [ ] 3.6.1 `translate(source, target, options) -> TranslationResult` for the deterministic path only.
-- [ ] 3.6.2 Stop at the first failing hop and keep partial outputs.
-- [ ] 3.6.3 Write outputs atomically (temp file then rename).
-- [ ] 3.6.4 Never overwrite an existing output without `--force`.
-- [ ] 3.6.5 Content-hash cache: skip work if input, options and tool versions are unchanged.
-- [ ] 3.6.6 Structured logging with a run ID.
+- [x] 3.6.1 `translate(source, target, options) -> TranslationResult` for the deterministic path only.
+- [x] 3.6.2 Stop at the first failing hop and keep partial outputs.
+- [x] 3.6.3 Write outputs atomically (temp file then rename).
+- [x] 3.6.4 Never overwrite an existing output without `--force`.
+- [x] 3.6.5 Content-hash cache: skip work if input, options and tool versions are unchanged.
+- [x] 3.6.6 Structured logging with a run ID.
 - **Acceptance:** golden HLSL shader translates to GLSL and the GLSL compiles back to SPIR-V that validates.
 
 ### 3.7 First vertical slice (milestone M1)
-- [ ] 3.7.1 Wire `shaderflux translate in.hlsl --to glsl --stage fragment` to the orchestrator, no LLM.
-- [ ] 3.7.2 Manual test on five real-world-style shaders written for the corpus.
-- [ ] 3.7.3 Record what failed. This list drives Phase 5 and 6 priorities.
+- [x] 3.7.1 Wire `shaderflux translate in.hlsl --to glsl --stage fragment` to the orchestrator, no LLM.
+- [ ] 3.7.2 Manual test on five real-world-style shaders written for the corpus. *(Not done: needs real-world-style shaders, and HLSL ones need a real `dxc`.)*
+- [ ] 3.7.3 Record what failed. This list drives Phase 5 and 6 priorities. *(Not done (depends on 3.7.2).)*
 - **Acceptance:** M1 demo recorded as a terminal session in `docs/`.
 
 ---
