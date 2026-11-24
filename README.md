@@ -2,11 +2,39 @@
 
 **An open-source assistant for getting shaders running on PC.**
 
+[![CI](https://github.com/theprexx7676/ShaderFlux-AI/actions/workflows/ci.yml/badge.svg)](https://github.com/theprexx7676/ShaderFlux-AI/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)
+
+[Quick start](#quick-start) · [Tutorial](docs/tutorial-first-port.md) · [Rules](#rules-at-a-glance) · [FAQ](#faq) · [Roadmap](#roadmap)
+
 ShaderFlux-AI helps developers who are porting a game or graphics project to PC and are stuck on the shader step. It wraps the standard open-source shader compilers, **finds the porting traps that cause silent bugs** (colliding bindings, transposed matrices, intrinsics that differ), **fixes the mechanical ones for you**, and tells you exactly what was and was not checked.
 
 **It needs no API key, no account and no network.** Everything above runs on your machine with deterministic tools. An LLM-assisted repair mode exists, but it is optional, experimental and uses *your own* key; nothing in this project depends on it or sends anything anywhere unless you ask.
 
-> **Status: early development (v0.0.1, not released).** Working today: `shaderflux lint` and `explain` for HLSL and GLSL (binding collisions, matrix-convention traps, intrinsic differences), `shaderflux fix` (no AI: inserts the binding attributes and matrix qualifiers that resolve BND001 and MAT002 in HLSL), translation of GLSL input to HLSL, GLSL or SPIR-V with SPIR-V validation and a re-check of the generated code, run reports (`--report`), `doctor`, `config show` and a GitHub Action. **Not yet proven:** HLSL *translation* has been checked against DXC 1.9 on Linux in CI only (Windows DXC and other versions are untested), the optional `translate --repair` has never run against the live API, and the Action's upload-to-code-scanning step has never been exercised. **Not built:** image comparison, batch mode, fixes for rules other than BND001 and MAT002. See the [roadmap](#roadmap) and the [detailed plan](docs/PLAN.md).
+> **Status: early development (v0.0.1, not released).**
+>
+> - **Works today:** `lint` and `explain` (HLSL and GLSL), `fix` (HLSL, no AI) with `--verify`, `init`, translation between HLSL, GLSL and SPIR-V (MSL output is untested) with SPIR-V validation and a re-check of the generated code, run reports, `doctor`, `config show`, and a GitHub Action.
+> - **Not yet proven:** DXC other than 1.9 on Linux (Windows DXC is untested); the optional `translate --repair` has never run against the live API; the Action's upload to code scanning has never run.
+> - **Not built:** image comparison, batch mode, fixes for rules other than `BND001` and `MAT002`.
+>
+> See the [roadmap](#roadmap) and the [detailed plan](docs/PLAN.md).
+
+## Quick start
+
+There is no release yet, so install from a clone (Python 3.11 or newer):
+
+```bash
+git clone https://github.com/theprexx7676/ShaderFlux-AI.git
+cd ShaderFlux-AI
+pip install .
+
+shaderflux lint 'shaders/**/*.hlsl'      # find the porting traps (needs no other tools)
+shaderflux fix  'shaders/**/*.hlsl'      # preview the mechanical fixes as a diff
+shaderflux fix  'shaders/**/*.hlsl' --write
+```
+
+`lint`, `fix`, `explain` and `init` are pure Python: they need no compiler, no API key and no network. Install DXC, glslang and SPIRV-Cross (see [Requirements](#requirements); `shaderflux doctor` tells you what is missing) to use `translate` and `fix --verify`. A walk-through with real output is in the [10-minute tutorial](docs/tutorial-first-port.md).
 
 ## Who is this for?
 
@@ -90,6 +118,29 @@ Run shaderflux explain <RULE> for the why and how to fix.
 For GLSL going to Vulkan it also flags what glslang would reject (`gl_VertexID`, loose uniforms, samplers without a binding, inputs and outputs without a location) and says what to write instead.
 
 `shaderflux explain BND001` gives the short story: why it happens, how to fix it, and how sure the tool is. The problems it looks for (bindings that collide, matrices that end up transposed, `mul` written in two orders, functions that are not plain renames) are the ones developers keep hitting; the sources are in [docs/pain-points.md](docs/pain-points.md) and the experiments in [docs/matrix-conventions.md](docs/matrix-conventions.md). Use `--sarif` to see findings in GitHub code scanning, or `--json` for scripts.
+
+### Rules at a glance
+
+| Rule | Looks for | Fixable by `fix` |
+| --- | --- | --- |
+| `BND001` | HLSL resources that collide on one Vulkan binding | yes |
+| `BND002` | Explicit `[[vk::binding]]` attributes that clash | no |
+| `VKG001` | `gl_VertexID` / `gl_InstanceID` in Vulkan GLSL | no |
+| `VKG002` | A uniform outside a block in Vulkan GLSL | no |
+| `VKG003` | A sampler, texture or image without a binding | no |
+| `VKG004` | An input or output without a location | no |
+| `MAT001` | `mul()` used with both operand orders | no |
+| `MAT002` | A constant-buffer matrix with no explicit layout | yes |
+| `MAT003` | `transpose()` on a constant-buffer matrix | no |
+| `MAT004` | Non-square matrix dimensions written in opposite orders | no |
+| `MAT005` | A `row_major` qualifier that translation will flip | no |
+| `INT001` | `fmod` / `mod` rounding differences for negative numbers | no |
+| `INT002` | `inverse()`, which HLSL lacks | no |
+| `INT003` | `round()` halfway cases | no |
+| `INC001` | An `#include` that is missing, forms a cycle, or points outside the allowed directories | no |
+| `LNT001` | A file too large or too long-lined to analyse (skipped, on purpose) | no |
+
+Every finding has a confidence level and a concrete suggestion; `shaderflux explain <RULE>` gives the why and how sure we are. The `VKG` rules apply only with `--target vulkan` (the default).
 
 ## Fix them, without AI
 
@@ -222,7 +273,14 @@ shaderflux config show
 shaderflux init . --github
 ```
 
-Exit codes: `0` success, `1` the translation failed (for example a compile error), `2` bad input or a missing tool, `3` a tool failed while running.
+Exit codes:
+
+| Code | Meaning |
+| --- | --- |
+| `0` | Success (for `lint`: nothing at or above `--fail-on`; for `fix --check`: nothing to fix) |
+| `1` | The translation failed, `lint` found errors, `fix --check` found pending fixes, or `fix --verify` found a problem |
+| `2` | Bad input, a bad option combination, or a tool that is missing (`fix --verify` without DXC says "not verified" and exits 2) |
+| `3` | An external tool or the optional model call failed while running |
 
 **Optional and experimental**: AI-assisted repair. It needs your own `ANTHROPIC_API_KEY` (the project provides none and never pays for usage) and sends your shader, see [docs/privacy.md](docs/privacy.md):
 
@@ -273,12 +331,16 @@ How the code is organised, and how to add a lint rule or a tool backend, is in [
 
 ## Requirements
 
-- Python 3.11 or newer.
-- External tools on your `PATH` (`shaderflux doctor` shows what is missing and how to install it):
-  - [SPIRV-Cross](https://github.com/KhronosGroup/SPIRV-Cross) and the [SPIRV-Tools](https://github.com/KhronosGroup/SPIRV-Tools) suite (`spirv-val`). Prefer a recent SPIRV-Cross: some distribution packages are years old.
-  - [glslang](https://github.com/KhronosGroup/glslang) or `glslc` for GLSL input.
-  - [DXC](https://github.com/microsoft/DirectXShaderCompiler) for HLSL input and for re-checking generated HLSL. It ships with the Vulkan SDK.
-  - `lint` and `explain` need none of these.
+- Python 3.11 or newer. The unit tests run in CI on Linux, macOS and Windows.
+- External tools on your `PATH` for some commands (`shaderflux doctor` shows what is missing and how to install it):
+
+| You want to run | You need |
+| --- | --- |
+| `lint`, `explain`, `fix`, `init`, `config` | nothing else |
+| `translate` from GLSL | [glslang](https://github.com/KhronosGroup/glslang) or `glslc`, and [SPIRV-Cross](https://github.com/KhronosGroup/SPIRV-Cross); [SPIRV-Tools](https://github.com/KhronosGroup/SPIRV-Tools) (`spirv-val`) to validate |
+| `translate` from HLSL, `fix --verify` | the above, plus [DXC](https://github.com/microsoft/DirectXShaderCompiler) (ships with the Vulkan SDK) |
+
+  Prefer a recent SPIRV-Cross: some distribution packages are years old. Only DXC 1.9 on Linux has been exercised; Windows DXC and other versions are untested.
 - Nothing else. An Anthropic API key (`ANTHROPIC_API_KEY`, yours) is needed only for the optional, experimental `translate --repair`.
 
 ## Privacy
@@ -309,6 +371,24 @@ Only the optional `translate --repair` talks to the network: when a shader fails
 - [ ] Experimental: render pipeline analysis
 
 The full breakdown, with acceptance criteria, is in [docs/PLAN.md](docs/PLAN.md).
+
+## FAQ
+
+**Do I need an API key or an account?** No. Everything except the optional `translate --repair` runs offline, with no key and no account. The project never uses a maintainer's key, so it can never run up a bill for anyone.
+
+**Does it send my shaders anywhere?** Only if you run `translate --repair`, and `--dry-run` shows exactly what would be sent first. See [docs/privacy.md](docs/privacy.md).
+
+**Will it change my files?** Not unless you ask. `fix` shows a diff and writes only with `--write` or `--out`, and it only inserts text. `lint` never changes anything.
+
+**How do I know the result is right?** Compiling is not the same as rendering correctly. `fix --verify` and `translate` check with real compilers and say what was **not** checked; image comparison is not built yet. Review the diff.
+
+**Does it work on Windows and macOS?** The unit tests pass on both in CI, and `lint`, `fix` and `init` are pure Python. The external tools differ per platform; DXC on Windows has not been exercised.
+
+**My GLSL stays on OpenGL. Why does `lint` report errors?** The `VKG` rules check for Vulkan GLSL. Use `--target any` (or `target: any` in the Action) to skip the Vulkan-specific rules.
+
+**How is this different from ShaderConductor or SPIRV-Cross?** Those convert code. ShaderFlux-AI uses the same compilers and adds the checks and fixes around them; see [How it compares](#how-it-compares).
+
+**Something is wrong or missing.** Please open an issue with the "Porting problem" template; a minimal failing shader is the most useful thing you can send.
 
 ## Help wanted
 
