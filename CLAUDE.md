@@ -78,6 +78,8 @@ the report what the review found. A "step" is one feature, fix or doc change.
 - Anything that costs money or time (an LLM call) must validate its output paths and option combinations **first**.
 - CI found what local runs could not. Shell scripts must work on **bash 3.2** (macOS default: no `globstar`, `mapfile`, `${x,,}`, `declare -A`); Windows shells expand no globs, so the CLI expands patterns itself (`expand_patterns`). CI runs tests **with coverage**, which can slow tight Python loops 25x, so timing tests assert how cost *scales* (`_assert_scales`), never an absolute time. Rich colours CLI `--help` on CI, so tests that read help text strip ANSI codes first.
 - Structure is checked by tests, not by memory: layering, one-place imports of `subprocess` and `anthropic`, UI libraries only in `cli`, no `print` in library code, and rule ids matching their documentation (`tests/unit/test_architecture.py`).
+- Gate every commit on the checks with `&&`: `make check && git add -A && git commit ... && git push`. A `;` between them once pushed a commit that failed lint (CI then failed on a line length).
+- Name the tool version you actually observed. A doc said "glslang 15.1.0" (my local version) while CI ran 16.2.0; read the CI log for the version before writing it down.
 - Child processes get a scrubbed environment (`tools/runner.py:clean_environment`); never pass secrets to tools.
 
 ## Known gaps (keep these honest in README and PLAN)
