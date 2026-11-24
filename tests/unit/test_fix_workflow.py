@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import shutil
+import sys
 from pathlib import Path
 
 import pytest
@@ -35,13 +36,18 @@ def test_default_is_a_dry_run_that_changes_nothing(shader: Path) -> None:
     assert shader.read_bytes() == before
 
 
-def test_write_changes_the_file_in_place_and_keeps_its_mode(shader: Path) -> None:
-    shader.chmod(0o640)
+def test_write_changes_the_file_in_place(shader: Path) -> None:
     outcome = run_fix(FixRequest(shader, write=True))
     assert outcome.written_to == shader
     assert "[[vk::binding(" in shader.read_text()
-    assert shader.stat().st_mode & 0o777 == 0o640
     assert run_fix(FixRequest(shader)).plan.edits == []  # idempotent
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows has no POSIX permission bits")
+def test_write_in_place_keeps_the_file_mode(shader: Path) -> None:
+    shader.chmod(0o640)
+    run_fix(FixRequest(shader, write=True))
+    assert shader.stat().st_mode & 0o777 == 0o640
 
 
 def test_out_writes_a_copy_and_leaves_the_original(shader: Path, tmp_path: Path) -> None:
