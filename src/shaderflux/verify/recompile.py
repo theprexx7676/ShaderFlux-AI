@@ -17,7 +17,7 @@ from shaderflux.core.models import (
     Target,
     ToolInfo,
 )
-from shaderflux.tools.base import BackendRegistry
+from shaderflux.tools.registry import BackendRegistry
 
 
 def recheck_generated(

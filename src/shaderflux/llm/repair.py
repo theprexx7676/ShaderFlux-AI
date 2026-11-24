@@ -21,7 +21,7 @@ from shaderflux.llm.schemas import PATCH_SCHEMA, PatchProposal, parse_proposal
 from shaderflux.pipeline.translate import TranslateOptions, translate
 from shaderflux.source.includes import build_include_graph
 from shaderflux.source.inputs import decode_text
-from shaderflux.tools.base import BackendRegistry
+from shaderflux.tools.registry import BackendRegistry
 
 
 class Outcome(StrEnum):

@@ -8,8 +8,9 @@ from pathlib import Path
 
 from shaderflux.core.errors import InvalidInputError
 from shaderflux.core.models import Diagnostic, Severity
-from shaderflux.tools.base import ToolResult, check_spirv_env, finish, locate, tool_info
+from shaderflux.tools.base import ToolResult, finish, locate, tool_info
 from shaderflux.tools.runner import run_tool, workspace
+from shaderflux.tools.validation import check_spirv_env
 
 _SPIRV_MAGIC = b"\x03\x02\x23\x07"  # 0x07230203, little endian
 _SPIRV_MAGIC_BE = b"\x07\x23\x02\x03"

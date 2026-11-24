@@ -18,7 +18,8 @@ from shaderflux.core.models import (
 )
 from shaderflux.pipeline.cache import TranslationCache
 from shaderflux.pipeline.translate import TranslateOptions, translate
-from shaderflux.tools.base import BackendRegistry, CrossOptions, ToolResult
+from shaderflux.tools.base import CrossOptions, ToolResult
+from shaderflux.tools.registry import BackendRegistry
 
 pytestmark = pytest.mark.unit
 

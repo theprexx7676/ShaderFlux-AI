@@ -8,8 +8,8 @@ import pytest
 
 from shaderflux.core.errors import ToolMissingError
 from shaderflux.core.models import ShaderLanguage, ShaderSource, Target
-from shaderflux.tools.base import BackendRegistry, ToolResult
-from shaderflux.tools.registry import default_registry
+from shaderflux.tools.base import ToolResult
+from shaderflux.tools.registry import BackendRegistry, default_registry
 
 pytestmark = pytest.mark.unit
 

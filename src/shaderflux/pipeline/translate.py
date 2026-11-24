@@ -21,7 +21,8 @@ from shaderflux.core.models import (
 from shaderflux.pipeline.cache import TranslationCache, make_key
 from shaderflux.pipeline.routes import HopKind, plan_route
 from shaderflux.source.includes import build_include_graph
-from shaderflux.tools.base import BackendRegistry, CrossOptions, ToolResult
+from shaderflux.tools.base import CrossOptions, ToolResult
+from shaderflux.tools.registry import BackendRegistry
 from shaderflux.verify.recompile import recheck_generated
 
 DEFAULT_SPIRV_ENVIRONMENT = "vulkan1.2"

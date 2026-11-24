@@ -8,15 +8,9 @@ from pathlib import Path
 
 from shaderflux.core.errors import InvalidInputError
 from shaderflux.core.models import Diagnostic, Severity, ShaderLanguage, ShaderStage, Target
-from shaderflux.tools.base import (
-    CrossOptions,
-    ToolResult,
-    check_entry_point,
-    finish,
-    locate,
-    tool_info,
-)
+from shaderflux.tools.base import CrossOptions, ToolResult, finish, locate, tool_info
 from shaderflux.tools.runner import run_tool, workspace
+from shaderflux.tools.validation import check_entry_point
 
 _STAGE_NAME = {
     ShaderStage.VERTEX: "vert",

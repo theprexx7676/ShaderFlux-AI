@@ -25,7 +25,8 @@ from shaderflux.llm.repair import (
     prepare_repair_prompt,
     repair_and_translate,
 )
-from shaderflux.tools.base import BackendRegistry, CrossOptions, ToolResult
+from shaderflux.tools.base import CrossOptions, ToolResult
+from shaderflux.tools.registry import BackendRegistry
 
 pytestmark = pytest.mark.unit
 

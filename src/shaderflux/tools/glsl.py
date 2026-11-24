@@ -15,16 +15,9 @@ from shaderflux.core.models import (
     ShaderStage,
     Target,
 )
-from shaderflux.tools.base import (
-    ToolResult,
-    check_spirv_env,
-    define_args,
-    display_name,
-    finish,
-    locate,
-    tool_info,
-)
+from shaderflux.tools.base import ToolResult, finish, locate, tool_info
 from shaderflux.tools.runner import run_tool, workspace
+from shaderflux.tools.validation import check_spirv_env, define_args, display_name
 
 _GLSLANG_STAGE = {
     ShaderStage.VERTEX: "vert",

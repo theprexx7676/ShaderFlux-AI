@@ -118,7 +118,7 @@ def test_display_name_cannot_become_a_compiler_option(path: str, expected: str) 
     from pathlib import Path
 
     from shaderflux.core.models import ShaderLanguage, ShaderSource
-    from shaderflux.tools.base import display_name
+    from shaderflux.tools.validation import display_name
 
     source = ShaderSource(path=Path(path), text="", language=ShaderLanguage.GLSL)
     assert display_name(source, "shader.frag") == expected
