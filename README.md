@@ -172,7 +172,7 @@ If the optional LLM is used, it never has the last word: a fix is kept only if t
 | Translation between HLSL, GLSL, SPIR-V and MSL | GLSL input works and is tested with real tools. HLSL input works against DXC 1.9 on Linux in CI; other DXC versions and Windows are untested. MSL output is implemented but untested |
 | Binding collision check and fix flags | Works; the printed DXC flags are confirmed against DXC 1.9 in CI |
 | Matrix-convention and intrinsic checks | Work; heuristic, each finding has a confidence level |
-| GLSL-to-Vulkan checks (`VKG001`-`VKG004`) | Work; agree with glslangValidator 15.1.0 on a 26-snippet table. Skip them with `--target any` if your GLSL stays on OpenGL |
+| GLSL-to-Vulkan checks (`VKG001`-`VKG004`) | Work; agree with glslangValidator 15.1.0 and 16.2.0 on a 26-snippet table. Skip them with `--target any` if your GLSL stays on OpenGL |
 | `explain` for every rule | Works |
 | Output re-check and run reports | Work for GLSL output; HLSL output is re-checked only if DXC is installed |
 | `fix`: binding attributes and matrix layout (HLSL) | Works, no AI; unit-tested, re-linted, and confirmed against DXC 1.9 on Linux in CI (other DXC versions and Windows untested) |

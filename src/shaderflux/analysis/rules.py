@@ -56,7 +56,7 @@ _BASE: tuple[RuleInfo, ...] = (
         "glslang reports the old names as undeclared identifiers when compiling for Vulkan.",
         "Rename to gl_VertexIndex / gl_InstanceIndex. The new built-ins count from the base "
         "vertex/instance of the draw call, so check shaders that draw with a non-zero base.",
-        "Confirmed with glslangValidator 15.1.0 (tests/integration/test_vulkan_glsl.py): the old "
+        "Confirmed with glslangValidator 15.1.0 and 16.2.0 (tests/integration/test_vulkan_glsl.py): the old "
         "name is rejected for Vulkan, the new name compiles. The base-vertex difference is "
         "from the GL_KHR_vulkan_glsl description and has not been run here (VERIFY).",
         ("https://github.com/KhronosGroup/GLSL/blob/main/extensions/khr/GL_KHR_vulkan_glsl.txt",),
@@ -68,7 +68,7 @@ _BASE: tuple[RuleInfo, ...] = (
         "uniforms: values must live in a uniform block (a buffer) or a push-constant block.",
         "Put the value into a block: layout(set = 0, binding = N) uniform Params { float gain; }; "
         "and update it through a buffer instead of glUniform.",
-        "Confirmed with glslangValidator 15.1.0 (tests/integration/test_vulkan_glsl.py): "
+        "Confirmed with glslangValidator 15.1.0 and 16.2.0 (tests/integration/test_vulkan_glsl.py): "
         "'non-opaque uniforms outside a block : not allowed when using GLSL for Vulkan'.",
         ("https://github.com/KhronosGroup/GLSL/blob/main/extensions/khr/GL_KHR_vulkan_glsl.txt",),
     ),
@@ -79,7 +79,7 @@ _BASE: tuple[RuleInfo, ...] = (
         "layout(binding = N) (and optionally set) in the shader itself.",
         "Write layout(set = 0, binding = N) uniform sampler2D tex; with an N that is unique "
         "in the set.",
-        "Confirmed with glslangValidator 15.1.0 (tests/integration/test_vulkan_glsl.py): "
+        "Confirmed with glslangValidator 15.1.0 and 16.2.0 (tests/integration/test_vulkan_glsl.py): "
         "'sampler/texture/image requires layout(binding=X)'.",
         ("https://github.com/KhronosGroup/GLSL/blob/main/extensions/khr/GL_KHR_vulkan_glsl.txt",),
     ),
@@ -90,7 +90,7 @@ _BASE: tuple[RuleInfo, ...] = (
         "layout(location = N), and glslang refuses user inputs and outputs without one.",
         "Add layout(location = N) to every `in` and `out` (user variables and interface "
         "blocks), with matching numbers in the neighbouring stage or the vertex layout.",
-        "Confirmed with glslangValidator 15.1.0 (tests/integration/test_vulkan_glsl.py): "
+        "Confirmed with glslangValidator 15.1.0 and 16.2.0 (tests/integration/test_vulkan_glsl.py): "
         "'SPIR-V requires location for user input/output'.",
         ("https://github.com/KhronosGroup/GLSL/blob/main/extensions/khr/GL_KHR_vulkan_glsl.txt",),
     ),

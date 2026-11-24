@@ -69,7 +69,7 @@ extension.
 
 *Tool:* rules `VKG001` to `VKG004`, each with the replacement to write.
 
-*Verified:* with glslangValidator 15.1.0, each construct is rejected for Vulkan with these
+*Verified:* with glslangValidator 15.1.0 (local) and 16.2.0 (CI), each construct is rejected for Vulkan with these
 messages: `'gl_VertexID' : undeclared identifier (Did you mean gl_VertexIndex?)`, `'non-opaque
 uniforms outside a block' : not allowed when using GLSL for Vulkan`, `'binding' :
 sampler/texture/image requires layout(binding=X)`, `'location' : SPIR-V requires location for
