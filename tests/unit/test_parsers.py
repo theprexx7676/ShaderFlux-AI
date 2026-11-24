@@ -102,3 +102,24 @@ def test_spirv_tools_env_translation() -> None:
     assert to_spirv_tools_env("vulkan1.1spirv1.4") == "vulkan1.1spv1.4"
     assert to_spirv_tools_env("vulkan1.2") == "vulkan1.2"
     assert to_spirv_tools_env(None) is None
+
+
+@pytest.mark.parametrize(
+    ("path", "expected"),
+    [
+        ("/x/-V.frag", "V.frag"),
+        ("/x/--help.frag", "help.frag"),
+        ("/x/ok name!.frag", "ok_name_.frag"),
+        ("/x/.hidden", "shader.frag"),
+        ("/x/---", "shader.frag"),
+    ],
+)
+def test_display_name_cannot_become_a_compiler_option(path: str, expected: str) -> None:
+    from pathlib import Path
+
+    from shaderflux.core.models import ShaderLanguage, ShaderSource
+    from shaderflux.tools.base import display_name
+
+    source = ShaderSource(path=Path(path), text="", language=ShaderLanguage.GLSL)
+    assert display_name(source, "shader.frag") == expected
+    assert not display_name(source, "shader.frag").startswith("-")

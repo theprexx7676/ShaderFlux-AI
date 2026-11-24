@@ -19,6 +19,7 @@ from pydantic import BaseModel, Field
 
 from shaderflux.analysis.findings import Confidence, Finding
 from shaderflux.core.models import Severity
+from shaderflux.core.text import LineIndex
 from shaderflux.pipeline.includes import mask_comments
 from shaderflux.tools.dxc import BindingPolicy
 
@@ -26,13 +27,33 @@ RegType = Literal["b", "t", "s", "u"]
 _TYPE_ORDER: tuple[RegType, ...] = ("b", "t", "s", "u")
 
 _REGISTER = re.compile(
-    r"(?P<name>\w+)\s*(?:\[[^\]]*\])?\s*:\s*register\s*\(\s*"
+    r"(?<!\w)(?P<name>\w+)(?:\s*\[[^\]]*\])?\s*:\s*register\s*\(\s*"
     r"(?P<type>[btsu])(?P<num>\d+)\s*(?:,\s*space(?P<space>\d+)\s*)?\)"
 )
 _VK_BINDING = re.compile(
     r"\[\[\s*vk::binding\s*\(\s*(?P<binding>\d+)\s*(?:,\s*(?P<set>\d+)\s*)?\)\s*\]\]"
 )
-_DECL_NAME = re.compile(r"(\w+)\s*(?:\[[^\]]*\])?\s*(?::\s*register\s*\([^)]*\))?\s*$")
+_TRAILING_REGISTER = re.compile(r":\s*register\s*\([^)]*\)$")
+_TRAILING_ARRAY = re.compile(r"\[[^\]]*\]$")
+_MAX_DECLARATION_CHARS = 2000
+
+
+def _declared_name(declaration: str) -> str | None:
+    """The identifier a declaration declares, found by walking back from its end.
+
+    Done by hand rather than with one big regex: the regex version backtracked
+    quadratically on long runs of whitespace (a denial-of-service on hostile input).
+    """
+    text = declaration.strip()
+    if len(text) > _MAX_DECLARATION_CHARS:
+        return None
+    text = _TRAILING_REGISTER.sub("", text).rstrip()
+    text = _TRAILING_ARRAY.sub("", text).rstrip()
+    end = len(text)
+    start = end
+    while start > 0 and (text[start - 1].isalnum() or text[start - 1] == "_"):
+        start -= 1
+    return text[start:end] if start < end else None
 
 
 class HlslBinding(BaseModel):
@@ -90,8 +111,10 @@ def parse_hlsl_bindings(text: str, *, file: str | None = None) -> list[HlslBindi
     masked = mask_comments(text)
     found: dict[str, HlslBinding] = {}
 
+    index = LineIndex(masked)
+
     def line_of(pos: int) -> int:
-        return masked.count("\n", 0, pos) + 1
+        return index.line_of(pos)
 
     for match in _REGISTER.finditer(masked):
         name = match.group("name")
@@ -110,10 +133,9 @@ def parse_hlsl_bindings(text: str, *, file: str | None = None) -> list[HlslBindi
             default=len(masked),
         )
         declaration = masked[match.end() : segment_end]
-        name_match = _DECL_NAME.search(declaration.strip())
-        if not name_match:
+        name = _declared_name(declaration)
+        if name is None:
             continue
-        name = name_match.group(1)
         binding = int(match.group("binding"))
         vk_set = int(match.group("set")) if match.group("set") is not None else None
         entry = found.get(name)

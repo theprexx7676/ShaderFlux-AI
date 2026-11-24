@@ -17,6 +17,7 @@ from dataclasses import dataclass
 
 from shaderflux.analysis.findings import Confidence, Finding
 from shaderflux.core.models import Severity, ShaderLanguage
+from shaderflux.core.text import LineIndex
 from shaderflux.pipeline.includes import mask_comments
 
 _HLSL_MATRIX_DECL = re.compile(
@@ -24,7 +25,7 @@ _HLSL_MATRIX_DECL = re.compile(
     r"(?:float|half|double|int|uint|bool)(?P<r>[1-4])x(?P<c>[1-4])\s+(?P<name>\w+)"
 )
 _HLSL_MATRIX_KEYWORD = re.compile(
-    r"\b(?:(?P<layout>row_major|column_major)\s+)?matrix\s*(?:<[^>]*>)?\s+(?P<name>\w+)"
+    r"\b(?:(?P<layout>row_major|column_major)\s+)?matrix(?:\s*<[^>]*>)?\s+(?P<name>\w+)"
 )
 _GLSL_MATRIX_DECL = re.compile(
     r"\b(?:layout\s*\(\s*(?P<layout>row_major|column_major)\s*\)\s*)?"
@@ -33,7 +34,7 @@ _GLSL_MATRIX_DECL = re.compile(
 _MUL_CALL = re.compile(r"\bmul\s*\(")
 _TRANSPOSE_CALL = re.compile(r"\btranspose\s*\(\s*(?P<arg>[\w.\[\]]+)")
 _PACK_PRAGMA = re.compile(r"#\s*pragma\s+pack_matrix\s*\(\s*(row_major|column_major)\s*\)")
-_CBUFFER = re.compile(r"\b(?:cbuffer|tbuffer)\s+\w+[^{;]*\{")
+_CBUFFER = re.compile(r"\b(?:cbuffer|tbuffer)\s+\w+[^{;]{0,200}\{")
 _CONSTANT_BUFFER_T = re.compile(r"\bConstantBuffer\s*<\s*(\w+)\s*>")
 _STRUCT = re.compile(r"\bstruct\s+(\w+)\s*\{")
 _UNIFORM_BLOCK = re.compile(r"\buniform\s+\w+\s*\{")
@@ -49,42 +50,50 @@ class _Matrix:
     pos: int
 
 
-def _line(text: str, pos: int) -> int:
-    return text.count("\n", 0, pos) + 1
-
-
-def _block_end(text: str, open_brace: int) -> int:
-    depth = 0
-    for i in range(open_brace, len(text)):
-        if text[i] == "{":
-            depth += 1
-        elif text[i] == "}":
-            depth -= 1
-            if depth == 0:
-                return i
-    return len(text)
+def _brace_pairs(text: str) -> dict[int, int]:
+    """Map every ``{`` to its matching ``}`` in a single pass (unmatched ones are absent)."""
+    pairs: dict[int, int] = {}
+    stack: list[int] = []
+    for i, ch in enumerate(text):
+        if ch == "{":
+            stack.append(i)
+        elif ch == "}" and stack:
+            pairs[stack.pop()] = i
+    return pairs
 
 
 def _hlsl_matrices(text: str) -> list[_Matrix]:
     found: list[_Matrix] = []
+    lines = LineIndex(text)
     for m in _HLSL_MATRIX_DECL.finditer(text):
         found.append(
             _Matrix(
-                m["name"], m["layout"], int(m["r"]), int(m["c"]), _line(text, m.start()), m.start()
+                m["name"],
+                m["layout"],
+                int(m["r"]),
+                int(m["c"]),
+                lines.line_of(m.start()),
+                m.start(),
             )
         )
     for m in _HLSL_MATRIX_KEYWORD.finditer(text):
-        found.append(_Matrix(m["name"], m["layout"], 4, 4, _line(text, m.start()), m.start()))
+        found.append(_Matrix(m["name"], m["layout"], 4, 4, lines.line_of(m.start()), m.start()))
     return found
 
 
 def _glsl_matrices(text: str) -> list[_Matrix]:
     found: list[_Matrix] = []
+    lines = LineIndex(text)
     for m in _GLSL_MATRIX_DECL.finditer(text):
         cols = int(m["c"])
         rows = int(m["r"]) if m["r"] else cols
-        found.append(_Matrix(m["name"], m["layout"], rows, cols, _line(text, m.start()), m.start()))
+        found.append(
+            _Matrix(m["name"], m["layout"], rows, cols, lines.line_of(m.start()), m.start())
+        )
     return found
+
+
+_MAX_CALL_CHARS = 2000  # a longer argument list is not a real mul() call; stops O(n^2) scans
 
 
 def _split_args(text: str, open_paren: int) -> list[str] | None:
@@ -92,7 +101,7 @@ def _split_args(text: str, open_paren: int) -> list[str] | None:
     depth = 0
     args: list[str] = []
     current: list[str] = []
-    for i in range(open_paren, len(text)):
+    for i in range(open_paren, min(len(text), open_paren + _MAX_CALL_CHARS)):
         ch = text[i]
         if ch in "([{":
             depth += 1
@@ -131,6 +140,7 @@ def _is_matrix_expr(arg: str, names: set[str]) -> bool:
 def _mul_conventions(text: str, matrix_names: set[str]) -> list[tuple[str, int]]:
     """Classify each ``mul`` call as ``vector-left``, ``matrix-left`` or ``matrix-matrix``."""
     results: list[tuple[str, int]] = []
+    lines = LineIndex(text)
     for m in _MUL_CALL.finditer(text):
         args = _split_args(text, m.end() - 1)
         if not args or len(args) != 2:
@@ -144,17 +154,18 @@ def _mul_conventions(text: str, matrix_names: set[str]) -> list[tuple[str, int]]
             kind = "matrix-left"
         else:
             continue
-        results.append((kind, _line(text, m.start())))
+        results.append((kind, lines.line_of(m.start())))
     return results
 
 
 def _cbuffer_regions(text: str) -> list[tuple[int, int]]:
     """Character ranges holding constant-buffer members (cbuffer and ConstantBuffer<T> bodies)."""
-    regions = [(m.end(), _block_end(text, m.end() - 1)) for m in _CBUFFER.finditer(text)]
+    pairs = _brace_pairs(text)
+    regions = [(m.end(), pairs.get(m.end() - 1, len(text))) for m in _CBUFFER.finditer(text)]
     used = {m.group(1) for m in _CONSTANT_BUFFER_T.finditer(text)}
     for m in _STRUCT.finditer(text):
         if m.group(1) in used:
-            regions.append((m.end(), _block_end(text, m.end() - 1)))
+            regions.append((m.end(), pairs.get(m.end() - 1, len(text))))
     return regions
 
 
@@ -163,6 +174,7 @@ def check_matrices(
 ) -> list[Finding]:
     """Run all matrix rules on one source file."""
     masked = mask_comments(text)
+    lines = LineIndex(masked)
     findings: list[Finding] = []
 
     if language is ShaderLanguage.HLSL:
@@ -229,7 +241,7 @@ def check_matrices(
                             "is often a workaround for a layout mismatch"
                         ),
                         file=file,
-                        line=_line(masked, m.start()),
+                        line=lines.line_of(m.start()),
                         confidence=Confidence.LOW,
                         suggestion="fix the layout at upload or declaration, not with transpose()",
                     )

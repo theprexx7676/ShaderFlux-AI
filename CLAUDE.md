@@ -2,7 +2,7 @@
 
 Open-source CLI that helps people port shaders to PC. A deterministic tool chain
 (DXC, SPIRV-Cross, SPIRV-Tools, glslang) does the mechanical work, lint rules find
-known porting traps, and an LLM (planned) helps with the rest. Real tools verify
+known porting traps, and an optional LLM (`translate --repair`, off by default) helps with the rest. Real tools verify
 results. Plan: `docs/PLAN.md`. Evidence for the rules: `docs/pain-points.md` and
 `docs/matrix-conventions.md`.
 
@@ -55,6 +55,14 @@ Dependency direction: `cli -> pipeline -> analysis/tools -> core`.
 - Rich treats `[[vk::binding]]` as markup: always `rich.markup.escape` user-facing text.
 - `GLSL -> GLSL` needs `--roundtrip` on purpose; it rewrites the code.
 - Use absolute paths in shell commands; a stray `cd` into a subfolder changes the working directory.
+
+## Lessons from reviewing my own work
+
+- Code that scans untrusted shader text must be **linear time**. Avoid adjacent `\s*` quantifiers, unbounded `[^x]*` before a required token, scanning backwards with a regex, and per-match `text.count("\n", 0, pos)` (use `core.text.LineIndex`). `tests/unit/test_lint_performance.py` feeds hostile inputs to every rule; extend it when adding a rule.
+- **A regression test must be shown to fail on the old code** (restore the old file from git, run it, restore the fix). One test here passed on the bug because a new safety limit short-circuited it.
+- Run a clean wheel install (`uv build --wheel`, install in a fresh venv) before claiming packaging works; editable installs hide missing package data.
+- Anything that costs money or time (an LLM call) must validate its output paths and option combinations **first**.
+- Child processes get a scrubbed environment (`tools/runner.py:clean_environment`); never pass secrets to tools.
 
 ## Known gaps (keep these honest in README and PLAN)
 

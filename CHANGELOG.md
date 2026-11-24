@@ -6,6 +6,13 @@ and the project aims to follow [Semantic Versioning](https://semver.org/) once r
 
 ## [Unreleased]
 
+### Fixed (review pass)
+- `lint` could hang for minutes on a crafted file (regex backtracking) and was quadratic on large files; now linear, with size and line-length limits (rule `LNT001`).
+- File names starting with `-` were interpreted as compiler options.
+- Child processes no longer inherit environment variables that look like secrets.
+- `translate` now checks `--out`, `--write-fixed` and `--report` and option combinations before doing any work or LLM call.
+- README claims that were stale or too strong were corrected.
+
 ### Added
 - Project README and detailed work plan (`docs/PLAN.md`).
 - Repository foundation: license, packaging, tooling, CI, templates and contributor docs.

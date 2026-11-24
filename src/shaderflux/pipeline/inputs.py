@@ -76,8 +76,10 @@ _STAGE_NAMES: dict[str, ShaderStage] = {
 
 _GLSL_PRAGMA_STAGE = re.compile(r"#\s*pragma\s+shader_stage\s*\(\s*(\w+)\s*\)")
 _HLSL_SHADER_ATTR = re.compile(r"\[\s*shader\s*\(\s*\"(\w+)\"\s*\)\s*\]")
-_HLSL_ENTRY = re.compile(r"\b(\w+)\s*\([^;{)]*\)\s*:\s*SV_\w+")
-_HLSL_NUMTHREADS = re.compile(r"\[\s*numthreads\s*\([^)]*\)\s*\]\s*(?:\[[^\]]*\]\s*)*void\s+(\w+)")
+_HLSL_ENTRY = re.compile(r"\b(\w+)\s*\([^;{)]{0,500}\)\s*:\s*SV_\w+")
+_HLSL_NUMTHREADS = re.compile(
+    r"\[\s*numthreads\s*\([^)]{0,100}\)\s*\]\s*(?:\[[^\]]{0,100}\]\s*){0,8}void\s+(\w+)"
+)
 
 
 def parse_stage_name(name: str) -> ShaderStage:

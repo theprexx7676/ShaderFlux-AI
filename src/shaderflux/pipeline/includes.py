@@ -15,6 +15,7 @@ from pathlib import Path
 
 from shaderflux.core.errors import InvalidInputError
 from shaderflux.core.models import Diagnostic, Severity
+from shaderflux.core.text import LineIndex
 from shaderflux.pipeline.inputs import decode_text
 
 _INCLUDE = re.compile(r'^[ \t]*#[ \t]*include[ \t]*(?P<open>["<])(?P<name>[^">\n]+)[">]', re.M)
@@ -123,8 +124,9 @@ def build_include_graph(
             add(Severity.ERROR, f"cannot read file: {exc.strerror or exc}", path, 1)
             state[path] = "done"
             return
+        lines = LineIndex(text)
         for match in _INCLUDE.finditer(text):
-            line = text.count("\n", 0, match.start()) + 1
+            line = lines.line_of(match.start())
             name = match.group("name").strip()
             target = resolve(match.group("open"), name, path)
             if target is None:

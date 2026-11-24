@@ -4,7 +4,7 @@
 
 ShaderFlux-AI helps developers who are porting a game or graphics project to PC and are stuck on the shader step. It wraps the standard open-source shader compilers and uses an LLM (Claude) for the parts those tools cannot do: fixing convention mismatches, mapping bindings, replacing missing intrinsics and explaining compiler errors.
 
-> **Status: early development.** Working today: `shaderflux lint` and `explain` for HLSL and GLSL (binding collisions, matrix-convention traps, intrinsic differences), translation of GLSL input to HLSL, GLSL or SPIR-V with validation, `doctor` and `config show`. HLSL *translation* is implemented but **not yet verified against a real DXC**. `translate --repair` (Claude proposes small fixes to compile errors, the real compiler checks them) is built and tested offline but **has not yet run against the live API**. Verification beyond SPIR-V validation, reports and batch mode are **planned, not built**. See the [roadmap](#roadmap) and the [detailed plan](docs/PLAN.md).
+> **Status: early development (v0.0.1, not released).** Working today: `shaderflux lint` and `explain` for HLSL and GLSL (binding collisions, matrix-convention traps, intrinsic differences), translation of GLSL input to HLSL, GLSL or SPIR-V with SPIR-V validation and a re-check of the generated code, run reports (`--report`), `doctor`, `config show` and a GitHub Action. **Not yet proven:** HLSL *translation* has never run against a real DXC, `translate --repair` (Claude proposes small fixes, the real compiler checks them) has never run against the live API, and the GitHub Action has not run on GitHub. **Not built:** reflection and image comparison, batch mode, a `fix` command. See the [roadmap](#roadmap) and the [detailed plan](docs/PLAN.md).
 
 ## Who is this for?
 
@@ -21,7 +21,7 @@ Translating shaders between platforms is slow and error-prone. The mechanical pa
 - Intrinsics, semantics and features that exist on one side only.
 - Cryptic compiler errors after an automatic conversion.
 
-ShaderFlux-AI automates the mechanical steps, uses the LLM for the judgment calls, and **checks every result with real compilers and validators** before calling it done.
+ShaderFlux-AI automates the mechanical steps, uses the LLM only for the judgment calls, and **checks results with real compilers and validators wherever they are installed**. Each report says exactly which checks ran and which did not.
 
 ## Demo
 
@@ -89,7 +89,7 @@ Run shaderflux explain <RULE> for the why and how to fix.
 
 ## What you get
 
-**The end result:** one command-line tool, `shaderflux`, that takes a shader and gives you back a PC-ready version plus a report you can trust.
+**The end result:** one command-line tool, `shaderflux`, that takes a shader and gives you back a translated version plus a report that says exactly what was checked.
 
 1. **A translated shader.** HLSL, GLSL or SPIR-V in; HLSL, GLSL, SPIR-V or MSL out, produced by the standard compiler tools rather than guessed.
 2. **A verdict and a report.** Each result says how far it was checked, from what really ran: the source compiled, the SPIR-V validated, the generated GLSL/HLSL compiled again. The report also lists what was **not** checked. Planned additions are same resources as the original and same pixels. Nothing is called "checked" unless the tool ran.
@@ -113,7 +113,7 @@ Good shader translators already exist, and ShaderFlux-AI builds on them rather t
 | [Naga](https://kvark.github.io/naga/shader/2022/02/17/shader-translation-benchmark.html) / Tint | Rust and Google translators used in WebGPU stacks |
 | [CrossTL](https://github.com/CrossGL/crosstl) | Translator built on its own intermediate language |
 
-ShaderFlux-AI uses the same standard compilers underneath. The goal is to add what a translator alone does not give you: **checks for porting traps** (bindings, matrix conventions, intrinsics), **explanations and small fixes** when conversion fails, and **a clear statement of what was and was not verified**. Several of these are still planned; see the roadmap.
+ShaderFlux-AI uses the same standard compilers underneath. The goal is to add what a translator alone does not give you: **checks for porting traps** (bindings, matrix conventions, intrinsics), **explanations and small fixes** when conversion fails, and **a clear statement of what was and was not verified**. The porting-trap checks and run reports work today; AI-assisted fixes are built but not yet proven against the live API; same-pixel comparison is planned.
 
 ## How it works
 
@@ -121,35 +121,36 @@ ShaderFlux-AI uses the same standard compilers underneath. The goal is to add wh
  source shader (HLSL / GLSL / SPIR-V)
         │
         ▼
- 1. Analyse   ── parse, resolve #includes, detect stage and language,
-        │         flag known porting risks (matrix order, bindings, ...)
+ 1. Analyse   ── resolve #includes, detect stage and language;
+        │         `lint` flags known porting risks (bindings, matrix order, ...)
         ▼
- 2. Convert   ── deterministic toolchain first (DXC → SPIR-V → SPIRV-Cross)
+ 2. Convert   ── deterministic toolchain (DXC / glslang → SPIR-V → SPIRV-Cross)
         │
         ▼
- 3. Repair    ── if conversion fails or output looks wrong, the LLM proposes
-        │         a fix as a small diff, using compiler errors as feedback
+ 3. Repair    ── only with --repair, only if compilation fails: the LLM proposes
+        │         small line edits; the real compiler decides whether they worked
         ▼
- 4. Verify    ── compile, validate (spirv-val), compare reflection data,
-        │         optionally render and compare images
+ 4. Check     ── validate the SPIR-V (spirv-val) and compile the generated GLSL/HLSL
+        │         again; planned: compare resources and rendered pixels
         ▼
- translated shader + report (what changed, why, confidence)
+ translated shader + report (what changed, what was and was not checked)
 ```
 
-The LLM never has the last word. A translation is only reported as successful if it passes the checks in step 4, and anything that was not verified is labelled as such.
+The LLM never has the last word: a fix is kept only if the real compiler accepts it, and anything that was not checked is labelled as such in the report.
 
-## Features (planned)
+## Features
 
-| Feature | What it does |
+| Feature | Status |
 | --- | --- |
-| Shader translation | HLSL, GLSL and SPIR-V in; HLSL, GLSL, SPIR-V (and MSL through SPIRV-Cross) out |
-| Binding mapping | Finds register/space collisions and proposes the DXC flags that fix them (**working**) |
-| Convention checks | Detects likely matrix-layout and `mul`-order mismatches (**working**, heuristic) |
-| Error repair | Reads compiler logs and proposes fixes, with a capped retry loop |
-| Verification | Compile, SPIR-V validation, reflection comparison, optional image comparison |
-| Explanations | Every change comes with a short reason, which is useful for learning |
-| Batch and permutations | Translate a shader with many `#define` variants in one run |
-| Offline mode | Run the deterministic pipeline without sending anything to an LLM |
+| Translation between HLSL, GLSL, SPIR-V and MSL | GLSL input works and is tested with real tools. HLSL input is implemented but **unverified** (needs DXC). MSL output is implemented but untested |
+| Binding collision check and fix flags | Works (the printed DXC flags still need confirming against a real DXC) |
+| Matrix-convention and intrinsic checks | Work; heuristic, each finding has a confidence level |
+| `explain` for every rule | Works |
+| Output re-check and run reports | Work for GLSL output; HLSL output is re-checked only if DXC is installed |
+| AI-assisted compile-error repair | Built, tested with a scripted model, **never run against the live API** |
+| Reflection and image comparison | Planned |
+| Batch and permutations | Planned |
+| Works fully offline | Yes, everything except `--repair` |
 
 ## Usage
 
@@ -214,8 +215,12 @@ A complete workflow is in [examples/workflows/lint-shaders.yml](examples/workflo
 ## Requirements
 
 - Python 3.11 or newer.
-- External tools on your `PATH`: [DXC](https://github.com/microsoft/DirectXShaderCompiler), [SPIRV-Cross](https://github.com/KhronosGroup/SPIRV-Cross) and the [SPIRV-Tools](https://github.com/KhronosGroup/SPIRV-Tools) suite (`spirv-val`, `spirv-opt`). A glslang or glslc binary is needed for GLSL input. `shaderflux doctor` will report what is missing.
-- An Anthropic API key (`ANTHROPIC_API_KEY`) for the LLM features, once they exist. It is not needed for offline mode.
+- External tools on your `PATH` (`shaderflux doctor` shows what is missing and how to install it):
+  - [SPIRV-Cross](https://github.com/KhronosGroup/SPIRV-Cross) and the [SPIRV-Tools](https://github.com/KhronosGroup/SPIRV-Tools) suite (`spirv-val`). Prefer a recent SPIRV-Cross: some distribution packages are years old.
+  - [glslang](https://github.com/KhronosGroup/glslang) or `glslc` for GLSL input.
+  - [DXC](https://github.com/microsoft/DirectXShaderCompiler) for HLSL input and for re-checking generated HLSL. It ships with the Vulkan SDK.
+  - `lint` and `explain` need none of these.
+- An Anthropic API key (`ANTHROPIC_API_KEY`) only for `translate --repair`. Nothing else needs it.
 
 ## Privacy
 
@@ -224,7 +229,7 @@ Only `translate --repair` talks to the network: when a shader fails to compile i
 ## Scope and limitations
 
 - **No proprietary console code.** Shaders written for console SDKs are usually covered by NDAs, so this repository does not include or support console-specific dialects. If you have legitimate access, convert them to plain HLSL first. An adapter interface for that is on the roadmap.
-- **"Correct" means verified within limits.** Passing compilation and validation does not prove identical rendering. Image comparison is optional and uses a software rasterizer, which is a testing aid and not a substitute for testing on real GPUs.
+- **"Correct" means verified within limits.** Passing compilation and validation does not prove identical rendering. Planned image comparison would use a software rasterizer, which is a testing aid and not a substitute for testing on real GPUs.
 - **LLM output can be wrong.** Review the diff and the report before shipping a translated shader.
 - **Tool versions matter.** Results depend on the versions of the external compilers. The tool records them in each report.
 
@@ -235,7 +240,9 @@ Only `translate --repair` talks to the network: when a shader fails to compile i
 - [ ] Deterministic conversion pipeline with compiler wrappers (done for GLSL input; HLSL needs DXC verification)
 - [x] Analysis: reflection, binding collisions, matrix and intrinsic checks, `lint` and `explain` (DXC-side verification pending)
 - [x] LLM repair loop with compiler verification (offline-tested; live API not yet exercised)
-- [ ] Command-line tool and first release
+- [x] Output re-check, verdicts and run reports
+- [x] GitHub Action for `lint` (script tested; not yet run on GitHub)
+- [ ] Command-line tool and first release (no release yet)
 - [ ] Test corpus and benchmarks
 - [ ] Batch and permutation support
 - [ ] Documentation and tutorials
@@ -256,7 +263,7 @@ If the project is useful to you, a star helps other graphics developers find it.
 
 ## Contributing
 
-Contributions are welcome once the foundation lands. Useful early help includes small test shaders with known tricky behaviour, reports of porting problems you have hit, and review of the plan. A `CONTRIBUTING.md` will be added with the foundation work.
+Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for setup and rules. Useful early help includes small test shaders with known tricky behaviour, reports of porting problems you have hit, and review of the plan.
 
 ## Acknowledgments
 
@@ -264,4 +271,4 @@ ShaderFlux-AI builds on the work of the DXC, SPIRV-Cross, SPIRV-Tools, glslang a
 
 ## License
 
-Distributed under the MIT License. Free for open-source use. The license file will be added with the foundation work. Third-party tools keep their own licenses.
+Distributed under the [MIT License](LICENSE). Third-party tools that ShaderFlux-AI runs keep their own licenses; see [THIRD_PARTY.md](THIRD_PARTY.md).

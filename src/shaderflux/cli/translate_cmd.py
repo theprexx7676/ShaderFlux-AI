@@ -42,6 +42,42 @@ def parse_define(raw: str) -> tuple[str, str | None]:
     return name, (value if sep else None)
 
 
+def _preflight(
+    *,
+    repair: bool,
+    dry_run: bool,
+    write_fixed: Path | None,
+    allow_large_edits: bool,
+    max_attempts: int | None,
+    out: Path | None,
+    force: bool,
+    report: Path | None,
+) -> None:
+    """Reject bad option combinations and unwritable outputs *before* any work or LLM spend."""
+    if not repair:
+        stray = [
+            flag
+            for flag, given in (
+                ("--dry-run", dry_run),
+                ("--write-fixed", write_fixed is not None),
+                ("--allow-large-edits", allow_large_edits),
+                ("--max-attempts", max_attempts is not None),
+            )
+            if given
+        ]
+        if stray:
+            raise InvalidInputError(f"{', '.join(stray)} only make sense together with --repair")
+    for flag, path in (("--out", out), ("--write-fixed", write_fixed)):
+        if path is None:
+            continue
+        if path.is_dir():
+            raise InvalidInputError(f"{flag} {path} is a directory; give a file name")
+        if path.exists() and not force:
+            raise InvalidInputError(f"{path} already exists (use --force to overwrite)")
+    if report is not None and report.is_dir():
+        raise InvalidInputError(f"--report {report} is a directory; give a file name")
+
+
 @handle_errors
 def translate_command(
     input_file: Path = typer.Argument(..., help="Shader file to translate.", exists=False),
@@ -71,7 +107,9 @@ def translate_command(
     dry_run: bool = typer.Option(
         False, "--dry-run", help="With --repair: show exactly what would be sent; send nothing."
     ),
-    max_attempts: int | None = typer.Option(None, "--max-attempts", help="Repair attempts."),
+    max_attempts: int | None = typer.Option(
+        None, "--max-attempts", min=1, max=10, help="Repair attempts (1 to 10)."
+    ),
     allow_large_edits: bool = typer.Option(
         False, "--allow-large-edits", help="Accept big rewrites."
     ),
@@ -86,6 +124,16 @@ def translate_command(
 ) -> None:
     """Translate a shader to another language using the deterministic tool chain."""
     setup_logging(verbose=verbose, quiet=quiet)
+    _preflight(
+        repair=repair,
+        dry_run=dry_run,
+        write_fixed=write_fixed,
+        allow_large_edits=allow_large_edits,
+        max_attempts=max_attempts,
+        out=out,
+        force=force,
+        report=report,
+    )
     settings = load_settings().settings
 
     target_language = parse_language_name(to)
@@ -177,12 +225,13 @@ def translate_command(
             ShaderLanguage.GLSL,
         ):
             try:
-                findings = lint_file(source.path, include_dirs=source.include_dirs).findings
+                findings = lint_file(
+                    source.path, language=source.language, include_dirs=source.include_dirs
+                ).findings
             except ShaderFluxError:
                 findings = None
-        original = source.model_copy(update={"text": outcome.original_text}) if outcome else source
         write_report(
-            build_report(original, target, result, repair=outcome, findings=findings), report
+            build_report(source, target, result, repair=outcome, findings=findings), report
         )
         if not quiet and not json_output:
             eprint(f"report written to {report}")

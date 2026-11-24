@@ -1,6 +1,6 @@
 # ShaderFlux-AI: Detailed Work Plan
 
-Status: **in progress.** Phases 1 and 3 are mostly implemented and Phase 2 is implemented except for verification of the DXC backend. Checked boxes (`[x]`) mean done and tested; notes in italics say what is partial or unverified.
+Status: **in progress** (v0.0.1, unreleased). Built and tested: phases 1 to 4 (foundation, tool layer, pipeline, analysis and `lint`), the core of phases 5 and 6 (LLM repair, tested only with a scripted model), output re-check and reports (phase 7/8, partly), and a GitHub Action. **Never run against the real thing:** the DXC backend (no `dxc` available), the live Claude API (no key), and the GitHub Action (no run on GitHub). Not built: reflection and image comparison, batch mode and permutations, a `fix` command, benchmarks, release. Checked boxes (`[x]`) mean done and tested; notes in italics say what is partial or unverified.
 
 How to read this document:
 - Phases are ordered by dependency. Each task has micro-steps as checkboxes and an **Acceptance** line that says when it is done.
@@ -280,6 +280,8 @@ Goal: translate shaders end to end with no LLM, whenever the tool chain can do i
 Goal: understand a shader well enough to catch porting problems before and after conversion.
 
 **Phase 4 progress:** reflection, binding analysis, matrix and intrinsic rules, and the `lint` / `explain` commands exist and are tested. Evidence for each rule is in `docs/matrix-conventions.md` and `docs/pain-points.md`. The AST spike (4.5) is not started.
+
+**Review pass (after phase 6):** a self-review found and fixed these, each with a regression test: (1) a quadratic-backtracking regex made `lint` hang for minutes on a crafted 60 KB file, and per-match line counting made big files quadratic; both are now linear, with hard size and line-length limits (`LNT001`); (2) the first regression test for (1) could not fail because the new line limit short-circuited it, so it was rewritten to call the rules directly and shown to fail on the old code; (3) file names starting with `-` were read by compilers as options; (4) child processes inherited secrets such as `ANTHROPIC_API_KEY`; (5) `translate` checked `--out` only after a paid repair finished; (6) several README claims were stale or too strong.
 
 ### 4.1 Reflection
 - [x] 4.1.1 Extract from SPIR-V: entry points, stage, inputs/outputs with locations, descriptor sets and bindings, resource types (UBO, SSBO, textures, samplers, storage images), push constants, workgroup size.

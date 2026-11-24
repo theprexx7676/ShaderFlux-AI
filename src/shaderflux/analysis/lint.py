@@ -16,6 +16,7 @@ from shaderflux.analysis.bindings import (
 )
 from shaderflux.analysis.findings import Confidence, Finding
 from shaderflux.analysis.intrinsics import check_intrinsics
+from shaderflux.analysis.limits import exceeds_limits, skipped_finding
 from shaderflux.analysis.matrix_rules import check_matrices
 from shaderflux.core.errors import InvalidInputError
 from shaderflux.core.models import Severity, ShaderLanguage
@@ -40,6 +41,9 @@ def lint_text(
     text: str, language: ShaderLanguage, *, file: str | None = None, vulkan: bool = True
 ) -> list[Finding]:
     """Lint a single piece of source (no include handling)."""
+    too_big = exceeds_limits(text)
+    if too_big:
+        return [skipped_finding(too_big, file)]
     findings: list[Finding] = []
     if language is ShaderLanguage.HLSL and vulkan:
         findings += binding_findings(
@@ -83,6 +87,10 @@ def lint_file(
     for file in graph.files:
         text = decode_text(file.read_bytes(), name=file.name)
         name = str(file)
+        too_big = exceeds_limits(text)
+        if too_big:
+            report.findings.append(skipped_finding(too_big, name))
+            continue
         report.findings += check_matrices(text, language, file=name)
         report.findings += check_intrinsics(text, language, file=name)
         if language is ShaderLanguage.HLSL and vulkan:

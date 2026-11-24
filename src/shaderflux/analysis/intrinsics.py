@@ -10,6 +10,7 @@ from importlib import resources
 
 from shaderflux.analysis.findings import Confidence, Finding
 from shaderflux.core.models import Severity, ShaderLanguage
+from shaderflux.core.text import LineIndex
 from shaderflux.pipeline.includes import mask_comments
 
 
@@ -61,6 +62,7 @@ def check_intrinsics(
     if language not in (ShaderLanguage.HLSL, ShaderLanguage.GLSL):
         return []
     masked = mask_comments(text)
+    lines = LineIndex(masked)
     findings: list[Finding] = []
     for entry in load_intrinsics():
         if not entry.flag:
@@ -75,7 +77,7 @@ def check_intrinsics(
                     severity=Severity.NOTE,
                     message=f"{name}(): {entry.title}. {entry.note or ''}".strip(),
                     file=file,
-                    line=masked.count("\n", 0, match.start()) + 1,
+                    line=lines.line_of(match.start()),
                     confidence=_CONFIDENCE.get(entry.evidence, Confidence.LOW),
                     suggestion=entry.fix,
                 )

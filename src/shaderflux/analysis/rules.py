@@ -49,6 +49,25 @@ _BASE: tuple[RuleInfo, ...] = (
         (_DXC_DOC,),
     ),
     RuleInfo(
+        "LNT001",
+        "File too large or too long-lined to analyse",
+        "The lint rules scan source text with pattern matching. To make sure a huge or "
+        "hostile file can never stall a build, files over 2,000,000 characters or with a "
+        "line over 20,000 characters are skipped, and this warning says so.",
+        "Split the file, or lint the hand-written source instead of generated output.",
+        "A fixed safety limit, not a judgement about the shader.",
+        (),
+    ),
+    RuleInfo(
+        "INC001",
+        "Include problem",
+        "An #include could not be resolved: the file is missing, the includes form a cycle, "
+        "or the path resolves outside the allowed directories.",
+        "Fix the path, break the cycle, or pass the directory with -I.",
+        "Follows directly from the source and the file system.",
+        (),
+    ),
+    RuleInfo(
         "MAT001",
         "mul() is used with both operand orders",
         "mul(v, M) treats v as a row vector and mul(M, v) as a column vector, so the same matrix "

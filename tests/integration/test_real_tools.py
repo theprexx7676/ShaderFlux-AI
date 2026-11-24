@@ -205,3 +205,20 @@ def test_reflect_helper_on_real_module(corpus: Path) -> None:
     assert params.kind is ResourceKind.UNIFORM_BUFFER
     assert params.slot == (0, 0)
     assert reflection.find("tex") is not None
+
+
+def test_file_named_like_an_option_still_compiles(tmp_path: Path, corpus: Path) -> None:
+    """Regression: a file called -V.frag used to be read by glslang as the -V option."""
+    require_any("glslangValidator", "glslc")
+    odd = tmp_path / "-V.frag"
+    odd.write_text((corpus / "glsl" / "textured.frag").read_text())
+    backend = (
+        GlslangBackend.discover()
+        if __import__("shutil").which("glslangValidator")
+        else GlslcBackend.discover()
+    )
+    source = ShaderSource(
+        path=odd, text=odd.read_text(), language=ShaderLanguage.GLSL, stage=ShaderStage.FRAGMENT
+    )
+    result = backend.compile(source, target=VULKAN)
+    assert result.ok, result.diagnostics

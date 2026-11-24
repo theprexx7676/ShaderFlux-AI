@@ -221,7 +221,13 @@ def check_spirv_env(environment: str | None) -> str | None:
 
 
 def display_name(source: ShaderSource, default: str) -> str:
-    """File name used for the temporary copy, so diagnostics show something meaningful."""
+    """File name used for the temporary copy, so diagnostics show something meaningful.
+
+    A name that starts with ``-`` would be read by the compiler as an option, so
+    leading dashes are removed. Anything unusual in the name becomes ``_``.
+    """
     if source.path is not None and source.path.name:
-        return re.sub(r"[^A-Za-z0-9._-]", "_", source.path.name)
+        name = re.sub(r"[^A-Za-z0-9._-]", "_", source.path.name).lstrip("-")
+        if name and not name.startswith("."):
+            return name
     return default

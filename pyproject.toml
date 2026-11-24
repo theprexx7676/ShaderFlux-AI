@@ -12,7 +12,7 @@ requires-python = ">=3.11"
 authors = [{ name = "ShaderFlux-AI contributors" }]
 keywords = ["shader", "hlsl", "glsl", "spir-v", "vulkan", "directx", "transpiler"]
 classifiers = [
-  "Development Status :: 1 - Planning",
+  "Development Status :: 2 - Pre-Alpha",
   "Environment :: Console",
   "Intended Audience :: Developers",
   "License :: OSI Approved :: MIT License",

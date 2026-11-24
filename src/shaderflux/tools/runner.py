@@ -108,6 +108,21 @@ def _kill_tree(proc: subprocess.Popen[bytes]) -> None:
             proc.kill()
 
 
+_SECRET_NAME = re.compile(
+    r"(?i)(api[_-]?key|token|secret|password|passwd|credential|private[_-]?key)"
+)
+
+
+def clean_environment(environ: Mapping[str, str] | None = None) -> dict[str, str]:
+    """A copy of the environment without anything that looks like a secret.
+
+    Shader tools never need an API key or token, so they never get one: a compromised
+    or buggy tool cannot leak what it was not given.
+    """
+    source = os.environ if environ is None else environ
+    return {k: v for k, v in source.items() if not _SECRET_NAME.search(k)}
+
+
 def run_tool(
     args: Sequence[str | os.PathLike[str]],
     *,
@@ -146,7 +161,7 @@ def run_tool(
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             cwd=cwd,
-            env=dict(env) if env is not None else None,
+            env=dict(env) if env is not None else clean_environment(),
             creationflags=creationflags,
             start_new_session=sys.platform != "win32",
         )

@@ -13,7 +13,13 @@ from shaderflux.core.errors import (
     ToolMissingError,
     ToolTimeoutError,
 )
-from shaderflux.tools.runner import redact_command, redact_text, run_tool, workspace
+from shaderflux.tools.runner import (
+    clean_environment,
+    redact_command,
+    redact_text,
+    run_tool,
+    workspace,
+)
 
 pytestmark = pytest.mark.unit
 
@@ -136,3 +142,32 @@ def test_redact_text_replaces_home_and_secrets() -> None:
 
 def test_redact_command_handles_each_argument() -> None:
     assert redact_command(["dxc", "/home/bob/x.hlsl"], home="/home/bob") == ["dxc", "~/x.hlsl"]
+
+
+def test_children_do_not_inherit_secrets(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-should-not-leak")
+    monkeypatch.setenv("GITHUB_TOKEN", "ghp_should_not_leak")
+    monkeypatch.setenv("MY_DB_PASSWORD", "hunter2")
+    monkeypatch.setenv("HARMLESS_SETTING", "visible")
+    run = run_tool(
+        py(
+            "import os; print(sorted(k for k in os.environ if k in "
+            "('ANTHROPIC_API_KEY','GITHUB_TOKEN','MY_DB_PASSWORD','HARMLESS_SETTING','PATH')))"
+        )
+    )
+    assert "HARMLESS_SETTING" in run.stdout_text
+    assert "ANTHROPIC_API_KEY" not in run.stdout_text
+    assert "GITHUB_TOKEN" not in run.stdout_text
+    assert "MY_DB_PASSWORD" not in run.stdout_text
+
+
+def test_clean_environment_keeps_ordinary_variables() -> None:
+    cleaned = clean_environment(
+        {"PATH": "/bin", "HOME": "/h", "AWS_SECRET_ACCESS_KEY": "x", "api_key": "y"}
+    )
+    assert cleaned == {"PATH": "/bin", "HOME": "/h"}
+
+
+def test_an_explicit_environment_is_used_as_given() -> None:
+    run = run_tool(py("import os; print(os.environ.get('CUSTOM'))"), env={"CUSTOM": "yes"})
+    assert run.stdout_text.strip() == "yes"
