@@ -4,15 +4,15 @@ build-backend = "hatchling.build"
 
 [project]
 name = "shaderflux"
-version = "0.0.1"
-description = "An open-source assistant for porting shaders to PC: a compiler toolchain, verified by real tools, with LLM help for the hard parts."
+version = "0.1.0"
+description = "Find and fix shader porting traps (HLSL, GLSL, SPIR-V) for PC, checked by real compilers. No API key needed; AI repair is an optional extra."
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.11"
 authors = [{ name = "ShaderFlux-AI contributors" }]
 keywords = ["shader", "hlsl", "glsl", "spir-v", "vulkan", "directx", "transpiler"]
 classifiers = [
-  "Development Status :: 2 - Pre-Alpha",
+  "Development Status :: 3 - Alpha",
   "Environment :: Console",
   "Intended Audience :: Developers",
   "License :: OSI Approved :: MIT License",

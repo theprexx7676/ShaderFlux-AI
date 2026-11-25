@@ -84,3 +84,35 @@ def test_everything_that_needs_no_ai_works_without_the_sdk(no_sdk: None, tmp_pat
     )
     assert runner.invoke(app, ["fix", "--check", str(shader)]).exit_code == 1
     assert runner.invoke(app, ["init", str(tmp_path / "p")]).exit_code == 0
+
+
+# ---- the install hint must not point at a PyPI name nobody here controls ---------------------
+
+
+def test_the_install_hint_points_at_the_github_repository_not_a_bare_pypi_name() -> None:
+    from shaderflux.llm.anthropic_provider import install_hint
+
+    hint = install_hint("0.1.0")
+    assert "git+https://github.com/theprexx7676/ShaderFlux-AI.git@v0.1.0" in hint
+    assert "shaderflux[ai]" in hint
+    # `pip install 'shaderflux[ai]'` would fail today, and would install a stranger's package
+    # if anyone registered that name on PyPI.
+    assert "pip install 'shaderflux[ai]'" not in hint
+    assert 'pip install "shaderflux[ai]"' not in hint
+
+
+def test_a_development_build_gets_no_release_tag_in_the_hint() -> None:
+    from shaderflux.llm.anthropic_provider import install_hint
+
+    hint = install_hint("0.0.0+unknown")
+    assert "ShaderFlux-AI.git`" in hint or 'ShaderFlux-AI.git"' in hint
+    assert "@v0.0.0" not in hint
+
+
+def test_the_hint_users_see_comes_from_the_same_function(no_sdk: None) -> None:
+    from shaderflux import __version__
+    from shaderflux.llm.anthropic_provider import install_hint
+
+    with pytest.raises(LlmError) as info:
+        AnthropicProvider().complete(REQUEST)
+    assert str(info.value) == install_hint(__version__)

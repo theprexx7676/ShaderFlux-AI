@@ -3,7 +3,7 @@
 #
 #   repos:
 #     - repo: https://github.com/theprexx7676/ShaderFlux-AI
-#       rev: main            # pin a release tag or commit once there is one
+#       rev: v0.1.0          # a release tag; update it to upgrade
 #       hooks:
 #         - id: shaderflux-lint
 #         - id: shaderflux-fix-check

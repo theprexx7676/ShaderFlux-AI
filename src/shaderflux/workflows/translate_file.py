@@ -17,7 +17,7 @@ from shaderflux.core.models import (
     Target,
     TranslationResult,
 )
-from shaderflux.llm.anthropic_provider import INSTALL_HINT, AnthropicProvider, sdk_available
+from shaderflux.llm.anthropic_provider import AnthropicProvider, install_hint, sdk_available
 from shaderflux.llm.prompts_loader import prompt_version
 from shaderflux.llm.provider import DEFAULT_MODEL, LlmProvider, LlmRequest
 from shaderflux.llm.repair import (
@@ -109,7 +109,7 @@ def check_request(request: TranslateRequest, *, needs_sdk: bool = True) -> None:
     ``needs_sdk`` is false when the caller supplies its own model provider (tests do).
     """
     if request.repair and not request.dry_run and needs_sdk and not sdk_available():
-        raise InvalidInputError(INSTALL_HINT)
+        raise InvalidInputError(install_hint())
     if request.dry_run and not request.repair:
         raise InvalidInputError("dry_run only makes sense together with repair")
     if request.write_fixed is not None and not request.repair:
