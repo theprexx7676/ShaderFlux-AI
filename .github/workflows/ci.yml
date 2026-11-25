@@ -105,19 +105,35 @@ jobs:
 
   # DXC is not in the Ubuntu archive, so download Microsoft's release. This is the only place the
   # HLSL path is exercised against a real DXC; it also records facts about DXC for the docs.
+  # The HLSL path against real DXC builds: the newest release ("latest") and the newest release
+  # of an older minor series ("older", see scripts/ci_select_dxc.py). The "latest" leg keeps the
+  # exact check name `dxc-tests`, which the branch ruleset requires; the other leg is named
+  # `dxc-tests (older)`.
   dxc-tests:
+    name: ${{ matrix.dxc == 'latest' && 'dxc-tests' || format('dxc-tests ({0})', matrix.dxc) }}
+    strategy:
+      fail-fast: false
+      matrix:
+        dxc: [latest, older]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: Install the other shader tools
         run: sudo apt-get update && sudo apt-get install -y spirv-tools glslang-tools spirv-cross glslc
+      - name: Choose the DXC release
+        id: dxc
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api "repos/microsoft/DirectXShaderCompiler/releases?per_page=50" > "$RUNNER_TEMP/releases.json"
+          python3 scripts/ci_select_dxc.py "${{ matrix.dxc }}" < "$RUNNER_TEMP/releases.json" | tee -a "$GITHUB_OUTPUT"
       - name: Install DXC from its GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           mkdir -p "$RUNNER_TEMP/dxc"
-          gh release download --repo microsoft/DirectXShaderCompiler \
-            --pattern 'linux_dxc_*.tar.gz' --dir "$RUNNER_TEMP/dxc"
+          gh release download "${{ steps.dxc.outputs.tag }}" --repo microsoft/DirectXShaderCompiler \
+            --pattern "${{ steps.dxc.outputs.asset }}" --dir "$RUNNER_TEMP/dxc"
           ls -la "$RUNNER_TEMP/dxc"
           tar -xzf "$RUNNER_TEMP"/dxc/linux_dxc_*.tar.gz -C "$RUNNER_TEMP/dxc"
           find "$RUNNER_TEMP/dxc" -maxdepth 2 -not -name '*.tar.gz' | head -30
