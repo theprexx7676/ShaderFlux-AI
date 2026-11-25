@@ -17,10 +17,28 @@ from shaderflux.llm.provider import DEFAULT_MODEL, LlmRequest, LlmResponse
 log = logging.getLogger("shaderflux")
 
 _FALLBACK_BETA = "server-side-fallback-2026-07-01"
-INSTALL_HINT = (
-    "the optional AI support is not installed: run `pip install 'shaderflux[ai]'` "
-    "(it also needs your own ANTHROPIC_API_KEY)"
-)
+REPOSITORY_URL = "https://github.com/theprexx7676/ShaderFlux-AI.git"
+
+
+def install_hint(version: str | None = None) -> str:
+    """How to install the optional AI extra.
+
+    The package is not on PyPI, so the hint names the GitHub repository (at the running
+    release's tag). A bare ``pip install 'shaderflux[ai]'`` would fail, and would install a
+    stranger's package if anyone registered that name.
+    """
+    if version is None:
+        from shaderflux import __version__
+
+        version = __version__
+    ref = f"@v{version}" if "+" not in version else ""  # "0.0.0+unknown" is a source tree
+    return (
+        "the optional AI support is not installed: run "
+        f'`pip install "shaderflux[ai] @ git+{REPOSITORY_URL}{ref}"` '
+        "(it also needs your own ANTHROPIC_API_KEY)"
+    )
+
+
 _NO_CREDENTIALS = (
     "no Anthropic credentials found: set the ANTHROPIC_API_KEY environment variable "
     "(or run `ant auth login`)"
@@ -37,7 +55,7 @@ def _sdk() -> Any:
     try:
         import anthropic
     except ImportError as exc:
-        raise LlmError(INSTALL_HINT) from exc
+        raise LlmError(install_hint()) from exc
     return anthropic
 
 

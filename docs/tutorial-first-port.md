@@ -30,7 +30,7 @@ float4 main(float2 uv : TEXCOORD0) : SV_Target
 ## 1. Install and check your tools
 
 ```bash
-pip install .            # from a clone of this repository (there is no release yet)
+pip install "git+https://github.com/theprexx7676/ShaderFlux-AI.git@v0.1.0"   # not on PyPI yet
 shaderflux doctor
 ```
 

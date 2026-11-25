@@ -12,7 +12,7 @@ ShaderFlux-AI helps developers who are porting a game or graphics project to PC 
 
 **It needs no API key, no account and no network.** Everything above runs on your machine with deterministic tools. An LLM-assisted repair mode exists, but it is optional, experimental and uses *your own* key; nothing in this project depends on it or sends anything anywhere unless you ask.
 
-> **Status: early development (v0.0.1, not released).**
+> **Status: early development (v0.1.0, the first release).**
 >
 > - **Works today:** `lint` and `explain` (HLSL and GLSL), `fix` (HLSL, no AI) with `--verify`, `init`, translation between HLSL, GLSL and SPIR-V (MSL output is untested) with SPIR-V validation and a re-check of the generated code, run reports, `doctor`, `config show`, and a GitHub Action.
 > - **Not yet proven:** DXC other than 1.9 on Linux (Windows DXC is untested); the optional `translate --repair` has never run against the live API; the Action's upload to code scanning has never run.
@@ -22,12 +22,10 @@ ShaderFlux-AI helps developers who are porting a game or graphics project to PC 
 
 ## Quick start
 
-There is no release yet, so install from a clone (Python 3.11 or newer):
+ShaderFlux-AI is not on PyPI yet, so install it from GitHub (Python 3.11 or newer):
 
 ```bash
-git clone https://github.com/theprexx7676/ShaderFlux-AI.git
-cd ShaderFlux-AI
-pip install .
+pip install "git+https://github.com/theprexx7676/ShaderFlux-AI.git@v0.1.0"
 
 shaderflux lint 'shaders/**/*.hlsl'      # find the porting traps (needs no other tools)
 shaderflux fix  'shaders/**/*.hlsl'      # preview the mechanical fixes as a diff
@@ -287,7 +285,7 @@ Exit codes:
 | `2` | Bad input, a bad option combination, or a tool that is missing (`fix --verify` without DXC says "not verified" and exits 2) |
 | `3` | An external tool or the optional model call failed while running |
 
-**Optional and experimental**: AI-assisted repair. It needs the optional extra (`pip install ".[ai]"`, which adds the Anthropic SDK) and your own `ANTHROPIC_API_KEY` (the project provides none and never pays for usage), and it sends your shader, see [docs/privacy.md](docs/privacy.md):
+**Optional and experimental**: AI-assisted repair. It needs the optional extra (`pip install "shaderflux[ai] @ git+https://github.com/theprexx7676/ShaderFlux-AI.git@v0.1.0"`, which adds the Anthropic SDK) and your own `ANTHROPIC_API_KEY` (the project provides none and never pays for usage), and it sends your shader, see [docs/privacy.md](docs/privacy.md):
 
 ```bash
 # See exactly what would be sent, and send nothing
@@ -305,7 +303,7 @@ Run the lint on every pull request that touches shaders, and see the findings in
 
 ```yaml
 - uses: actions/checkout@v4
-- uses: theprexx7676/ShaderFlux-AI@main   # pin a release tag or commit once there is one
+- uses: theprexx7676/ShaderFlux-AI@v0.1.0   # a release tag; update it to upgrade
   with:
     paths: "shaders/**/*.hlsl shaders/**/*.glsl"
     fail-on: error          # error | warning | note | never
@@ -323,7 +321,7 @@ Check shaders on every commit with [pre-commit](https://pre-commit.com). Add thi
 ```yaml
 repos:
   - repo: https://github.com/theprexx7676/ShaderFlux-AI
-    rev: main          # pin a release tag or commit once there is one
+    rev: v0.1.0        # a release tag; update it to upgrade
     hooks:
       - id: shaderflux-lint          # find porting traps in HLSL and GLSL
       - id: shaderflux-fix-check     # fail if `shaderflux fix` would change an HLSL shader
@@ -361,7 +359,7 @@ How the code is organised, and how to add a lint rule or a tool backend, is in [
 | `translate` from HLSL, `fix --verify` | the above, plus [DXC](https://github.com/microsoft/DirectXShaderCompiler) (ships with the Vulkan SDK) |
 
   Prefer a recent SPIRV-Cross: some distribution packages are years old. Only DXC 1.9 on Linux has been exercised; Windows DXC and other versions are untested.
-- Nothing else. The optional, experimental `translate --repair` needs the `ai` extra (`pip install ".[ai]"`) and your own `ANTHROPIC_API_KEY`; without the extra it explains how to install it and exits with code 2 before doing any work.
+- Nothing else. The optional, experimental `translate --repair` needs the `ai` extra (`pip install "shaderflux[ai] @ git+https://github.com/theprexx7676/ShaderFlux-AI.git@v0.1.0"`) and your own `ANTHROPIC_API_KEY`; without the extra it explains how to install it and exits with code 2 before doing any work.
 
 ## Privacy
 
@@ -384,7 +382,7 @@ Only the optional `translate --repair` talks to the network: when a shader fails
 - [x] Optional, experimental LLM repair loop with compiler verification (offline-tested; live API not yet exercised)
 - [x] Output re-check, verdicts and run reports
 - [x] GitHub Action for `lint` (runs in CI on this repository; SARIF upload not yet exercised)
-- [ ] Command-line tool and first release (no release yet)
+- [x] Command-line tool and first release (v0.1.0, installed from GitHub; not on PyPI yet)
 - [ ] Test corpus and benchmarks
 - [ ] Batch and permutation support
 - [ ] Documentation and tutorials

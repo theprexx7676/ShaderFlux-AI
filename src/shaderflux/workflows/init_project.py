@@ -47,7 +47,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: theprexx7676/ShaderFlux-AI@main # pin a release tag or commit once there is one
+      - uses: theprexx7676/ShaderFlux-AI@v0.1.0 # a release tag; update it to upgrade
         with:
           paths: "{directory}/**/*.hlsl {directory}/**/*.glsl"
           fail-on: error

@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-The project is pre-release. Only the `main` branch receives fixes.
+The project is in early development. Only the latest release (0.1.x) and the `main` branch receive fixes.
 
 ## Reporting a vulnerability
 
