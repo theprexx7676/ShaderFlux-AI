@@ -120,7 +120,7 @@ shaderflux fix lighting.hlsl --verify --stage fragment
 `--verify` recompiles the shader with DXC and checks that no two resources share a binding. It
 refuses to write a fix that would stop a compiling shader from compiling. Without DXC it says
 **not verified** and exits with code 2 instead of pretending. (This step has been run against
-DXC 1.9 on Linux in this project's CI; DXC on Windows and other versions are untested.)
+two DXC builds on Linux in this project's CI; DXC on Windows is untested.)
 
 ## 7. Keep it fixed
 

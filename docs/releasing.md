@@ -6,6 +6,7 @@
 2. **Check the build, not only the tests.** `uv build`, install the wheel into a fresh virtual environment, and run `shaderflux --version`, `shaderflux explain INT001` (reads a bundled data file) and `shaderflux translate <glsl> --to hlsl --repair --dry-run` (reads the bundled prompts). Check that the sdist contains the same data files.
 3. **Open the pull request, wait for every job, merge.**
 4. **Tag the merge commit** and push the tag: `git tag -a vX.Y.Z -m "ShaderFlux-AI X.Y.Z" <merge commit> && git push origin vX.Y.Z`.
+   Some restricted environments (cloud coding sessions, for example) refuse tag pushes with HTTP 403. In that case create the tag from a normal clone, or create the release in the GitHub web UI (Releases, "Draft a new release", choose or create the tag on the merge commit); the next step then runs the same way.
 5. **Check the tag from the outside:** in a clean environment run `pip install "git+https://github.com/theprexx7676/ShaderFlux-AI.git@vX.Y.Z"` and `shaderflux --version`; run `pre-commit try-repo https://github.com/theprexx7676/ShaderFlux-AI shaderflux-lint --rev vX.Y.Z --files <a shader>`.
 6. **Create the GitHub Release** from the tag and paste the changelog section as the notes.
 

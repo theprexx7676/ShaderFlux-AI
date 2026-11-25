@@ -5,9 +5,11 @@ Reads the JSON list from ``GET /repos/microsoft/DirectXShaderCompiler/releases``
 input and prints ``tag=...`` and ``asset=...`` lines (the format of ``$GITHUB_OUTPUT``).
 
 * ``latest``: the newest published (not draft, not pre-release) release that has a Linux build.
-* ``older``: the newest such release from an *older minor series* than the latest one (for
-  example 1.8.x when the latest is 1.9.x), so the second job tests a genuinely different DXC and
-  not the previous patch of the same one.
+* ``older``: the newest such release from an *older minor series by tag* than the latest one
+  (for example v1.8.x when the latest is v1.9.x), so the second job tests a genuinely different
+  build and not the previous patch of the same one. Note: Microsoft's v1.8.2505.1 Linux binary
+  reports itself as ``1.9(dev;...)``, so the series is the release tag's, not what ``dxc --version``
+  prints.
 
 The Linux build is the asset named ``linux_dxc_*.tar.gz``. Used by ``.github/workflows/ci.yml``;
 tested in ``tests/unit/test_ci_select_dxc.py``.

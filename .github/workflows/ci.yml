@@ -106,7 +106,8 @@ jobs:
   # DXC is not in the Ubuntu archive, so download Microsoft's release. This is the only place the
   # HLSL path is exercised against a real DXC; it also records facts about DXC for the docs.
   # The HLSL path against real DXC builds: the newest release ("latest") and the newest release
-  # of an older minor series ("older", see scripts/ci_select_dxc.py). The "latest" leg keeps the
+  # of an older minor series by tag ("older", see scripts/ci_select_dxc.py; that release's binary
+  # reports itself as 1.9 dev, so compare the `dxc --version` lines in the logs). The "latest" leg keeps the
   # exact check name `dxc-tests`, which the branch ruleset requires; the other leg is named
   # `dxc-tests (older)`.
   dxc-tests:

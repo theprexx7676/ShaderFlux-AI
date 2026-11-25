@@ -15,7 +15,7 @@ ShaderFlux-AI helps developers who are porting a game or graphics project to PC 
 > **Status: early development (v0.1.0, the first release).**
 >
 > - **Works today:** `lint` and `explain` (HLSL and GLSL), `fix` (HLSL, no AI) with `--verify`, `init`, translation between HLSL, GLSL and SPIR-V (MSL output is untested) with SPIR-V validation and a re-check of the generated code, run reports, `doctor`, `config show`, and a GitHub Action.
-> - **Not yet proven:** DXC other than 1.9 on Linux (Windows DXC is untested); the optional `translate --repair` has never run against the live API; the Action's upload to code scanning has never run.
+> - **Not yet proven:** Windows DXC, and DXC builds other than the two tested on Linux; the optional `translate --repair` has never run against the live API; the Action's upload to code scanning has never run.
 > - **Not built:** image comparison, batch mode, fixes for rules other than `BND001` and `MAT002`.
 >
 > See the [roadmap](#roadmap) and the [detailed plan](docs/PLAN.md).
@@ -223,13 +223,13 @@ If the optional LLM is used, it never has the last word: a fix is kept only if t
 
 | Feature | Status |
 | --- | --- |
-| Translation between HLSL, GLSL, SPIR-V and MSL | GLSL input works and is tested with real tools. HLSL input works against DXC 1.9 on Linux in CI; other DXC versions and Windows are untested. MSL output is implemented but untested |
-| Binding collision check and fix flags | Works; the printed DXC flags are confirmed against DXC 1.9 in CI |
+| Translation between HLSL, GLSL, SPIR-V and MSL | GLSL input works and is tested with real tools. HLSL input works against two DXC builds on Linux in CI; Windows DXC is untested. MSL output is implemented but untested |
+| Binding collision check and fix flags | Works; the printed DXC flags are confirmed against two DXC builds in CI |
 | Matrix-convention and intrinsic checks | Work; heuristic, each finding has a confidence level |
 | GLSL-to-Vulkan checks (`VKG001`-`VKG004`) | Work; agree with glslangValidator 15.1.0 and 16.2.0 on a 26-snippet table. Skip them with `--target any` if your GLSL stays on OpenGL |
 | `explain` for every rule | Works |
 | Output re-check and run reports | Work for GLSL output; HLSL output is re-checked only if DXC is installed |
-| `fix`: binding attributes and matrix layout (HLSL) | Works, no AI; unit-tested, re-linted, and confirmed against DXC 1.9 on Linux in CI (other DXC versions and Windows untested) |
+| `fix`: binding attributes and matrix layout (HLSL) | Works, no AI; unit-tested, re-linted, and confirmed against two DXC builds on Linux in CI (Windows untested) |
 | Optional AI-assisted compile-error repair (`--repair`, your own key) | **Experimental.** Built, tested with a scripted model, **never run against the live API** |
 | Reflection and image comparison | Planned |
 | Batch and permutations | Planned |
@@ -358,7 +358,7 @@ How the code is organised, and how to add a lint rule or a tool backend, is in [
 | `translate` from GLSL | [glslang](https://github.com/KhronosGroup/glslang) or `glslc`, and [SPIRV-Cross](https://github.com/KhronosGroup/SPIRV-Cross); [SPIRV-Tools](https://github.com/KhronosGroup/SPIRV-Tools) (`spirv-val`) to validate |
 | `translate` from HLSL, `fix --verify` | the above, plus [DXC](https://github.com/microsoft/DirectXShaderCompiler) (ships with the Vulkan SDK) |
 
-  Prefer a recent SPIRV-Cross: some distribution packages are years old. Only DXC 1.9 on Linux has been exercised; Windows DXC and other versions are untested.
+  Prefer a recent SPIRV-Cross: some distribution packages are years old. CI exercises two DXC builds on Linux in CI (release `v1.9.2609`, and release `v1.8.2505.1`, whose binary reports itself as `1.9(dev;4950-b106a961)`); Windows DXC is untested.
 - Nothing else. The optional, experimental `translate --repair` needs the `ai` extra (`pip install "shaderflux[ai] @ git+https://github.com/theprexx7676/ShaderFlux-AI.git@v0.1.0"`) and your own `ANTHROPIC_API_KEY`; without the extra it explains how to install it and exits with code 2 before doing any work.
 
 ## Privacy
@@ -376,7 +376,7 @@ Only the optional `translate --repair` talks to the network: when a shader fails
 
 - [x] Project idea and scope
 - [x] Foundation: repository layout, tooling, packaging (CI green on Linux, macOS and Windows with Python 3.11 to 3.13)
-- [x] Deterministic conversion pipeline with compiler wrappers (GLSL input everywhere; HLSL input checked against DXC 1.9 on Linux in CI)
+- [x] Deterministic conversion pipeline with compiler wrappers (GLSL input everywhere; HLSL input checked against two DXC builds on Linux in CI)
 - [x] Analysis: reflection, binding collisions, matrix and intrinsic checks, `lint` and `explain` (DXC-side verification pending)
 - [x] `shaderflux fix` for binding collisions and matrix layout (no AI)
 - [x] Optional, experimental LLM repair loop with compiler verification (offline-tested; live API not yet exercised)
