@@ -30,3 +30,7 @@ scratch/
 .vscode/
 .DS_Store
 Thumbs.db
+
+# Compiler output dropped in the working directory by hand-run tools (glslang writes vert.spv, ...)
+/*.spv
+/*.dxil
