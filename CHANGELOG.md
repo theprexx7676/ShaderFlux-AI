@@ -6,6 +6,9 @@ and the project follows [Semantic Versioning](https://semver.org/). Before 1.0, 
 
 ## [Unreleased]
 
+### Added
+- CI now runs the HLSL tests against two DXC builds on Linux: the latest release (`v1.9.2609`, reports `1.9(5512-01b62ad4)(1.9.2609.5)`) and the newest release of an older series (`v1.8.2505.1`, whose binary reports `1.9(dev;4950-b106a961)`). Both passed all 20 tests and produced identical output from `scripts/dxc_experiments.py` (binding mapping, matrix packing, SPIRV-Cross re-check). The legs are chosen by `scripts/ci_select_dxc.py`.
+
 ## [0.1.0] - 2026-11-25
 
 The first release. Early development: usable today, not yet proven everywhere (see "Known limits").

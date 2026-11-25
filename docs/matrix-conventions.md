@@ -95,7 +95,7 @@ A bug this found: without `--shader-model`, SPIRV-Cross writes Shader Model 3 HL
 ## Still not verified
 
 - Options such as `-fvk-use-gl-layout` and `-fvk-use-dx-layout`.
-- Other DXC versions, and the Windows build of DXC (the one most developers have). Only the Linux 1.9 release was exercised.
+- The Windows build of DXC (the one most developers have). The experiments were run on two Linux builds (release `v1.9.2609` and release `v1.8.2505.1`, which reports itself as `1.9(dev;4950-b106a961)`) and printed identical results; other builds were not tried.
 
 Note that published sources disagree on HLSL's default storage ("row-major" in the Vulkan guide,
 "column-major" in several forum posts). The disagreement is partly terminology: storage order,
