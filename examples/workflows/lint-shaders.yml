@@ -1,0 +1,21 @@
+# Copy to .github/workflows/lint-shaders.yml in your shader repository.
+name: Lint shaders
+
+on:
+  pull_request:
+    paths: ["shaders/**"]
+
+permissions:
+  contents: read
+  security-events: write # only needed for upload-sarif
+
+jobs:
+  shaderflux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: theprexx7676/ShaderFlux-AI@main # pin a release tag or commit once there is one
+        with:
+          paths: "shaders/**/*.hlsl shaders/**/*.glsl"
+          fail-on: error
+          upload-sarif: "true"

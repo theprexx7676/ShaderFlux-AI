@@ -1,0 +1,683 @@
+# ShaderFlux-AI: Detailed Work Plan
+
+Status: **in progress** (v0.0.1, unreleased). Built and tested: phases 1 to 4 (foundation, tool layer, pipeline, analysis and `lint`), a deterministic `shaderflux fix` (BND001, MAT002; no AI), the core of phases 5 and 6 (optional LLM repair, tested only with a scripted model), output re-check and reports (phase 7/8, partly), and a GitHub Action. **Direction:** the project must be fully useful without any API key; the LLM is optional, experimental and uses the user's own key. **Never run against the real thing:** the live Claude API (no key), the SARIF upload step of the Action, Windows DXC and other DXC versions (DXC 1.9 on Linux runs in CI). Not built: image comparison, batch mode and permutations, fixes for other rules, benchmarks, release. Checked boxes (`[x]`) mean done and tested; notes in italics say what is partial or unverified.
+
+How to read this document:
+- Phases are ordered by dependency. Each task has micro-steps as checkboxes and an **Acceptance** line that says when it is done.
+- IDs (for example `3.2.4`) are stable, so issues and commits can refer to them.
+- Anything marked **VERIFY** is a fact I could not confirm from the sources I found. The step must check it (tool help output, docs, or a tiny experiment) before relying on it.
+- Anything marked **DECISION** needs your approval before work starts.
+
+---
+
+## 0. Ground rules
+
+### 0.1 Product statement
+An open-source assistant that helps developers port shaders to PC. A deterministic compiler chain does the mechanical work. An LLM handles judgment calls. Real compilers and validators verify every result.
+
+### 0.1b Product direction (updated)
+The tool should solve problems people already search for and fail to find answered, and be pleasant to use. In practice that means: **lint-first** (`shaderflux lint` and `shaderflux explain` are the front door, translation is the second step); every message names a concrete fix; output works for people (colour, short text) and for machines (JSON, SARIF for GitHub code scanning); and every claim is backed by evidence recorded in `docs/pain-points.md` or `docs/matrix-conventions.md`. Planned additions that follow from this: a GitHub Action running `lint` on pull requests, an `init` command that writes a starter config, a short guided `shaderflux port` flow.
+
+### 0.2 Principles
+1. **Tools first, LLM second.** Never ask the LLM to do what DXC, SPIRV-Cross or a lint rule can do exactly.
+2. **Nothing is "done" until verified.** Output is labelled `verified`, `partially verified` or `unverified`.
+3. **Small, reviewable changes.** The LLM proposes diffs, not whole-file rewrites, wherever possible.
+4. **Reproducible.** Every report records tool versions, model name, prompts' version, and input hashes.
+5. **Works offline.** The deterministic pipeline must run with no network and no API key.
+6. **Privacy by default.** No shader leaves the machine unless the user enabled LLM features and configured a key.
+7. **No proprietary content.** No console SDK code, headers or shaders in the repo, tests or prompts.
+8. **Honest scope.** Do not claim "exact rendering output". Claim "verified within stated checks".
+
+### 0.3 Decisions to confirm (DECISION)
+| # | Decision | My default | Alternatives |
+| --- | --- | --- | --- |
+| D1 | Implementation language | Python 3.11+ | Rust, C++ |
+| D2 | LLM provider | Claude via the Anthropic SDK, behind an interface | Multi-provider from day one |
+| D3 | Primary first direction | HLSL to SPIR-V/GLSL | GLSL to HLSL |
+| D4 | CLI framework | Typer | argparse, Click |
+| D5 | Data models | Pydantic v2 | dataclasses |
+| D6 | Build backend and env tool | hatchling + uv | setuptools, poetry |
+| D7 | Copyright holder name for LICENSE | (needed from you) | n/a |
+| D8 | Distribution | PyPI package + Docker image with tools preinstalled | PyPI only |
+| D9 | Project name on PyPI | `shaderflux` (check availability) | `shaderflux-ai` |
+
+### 0.4 Corrections from my earlier answers (self-check)
+These are things I said before that need fixing or a caveat:
+- **Broken link.** One link in my earlier message to the Vulkan Guide HLSL page contained a stray hidden character. The correct URL is `https://github.com/KhronosGroup/Vulkan-Guide/blob/master/chapters/hlsl.adoc`.
+- **Tool health is unconfirmed.** I implied ShaderConductor and SPIRV-Cross are safe long-term foundations. My checks could not confirm current maintenance status for either. Consequence: tool backends are pluggable, versions are pinned, and Phase 2 includes a maintenance-status check (last release, open issues) before committing.
+- **Slang license.** Sources disagreed (Apache 2.0 with LLVM exception vs MIT). **VERIFY** in the Slang repository's LICENSE file before bundling or linking anything.
+- **Matrix conventions.** The sources I found describe "row-major vs column-major" inconsistently, because storage order and math convention are different things and are often mixed up. Task 4.3.1 builds a verified convention table from experiments instead of from memory.
+- **README roadmap.** The old README ticked "local prototyping" but the repository contained no code. I changed that item to "Project idea and scope".
+- **Software rasterizer.** Lavapipe describes itself as non-conformant and for testing use only. Image comparison is therefore a regression aid, not proof. SwiftShader is an alternative worth evaluating.
+- **Binding flags.** DXC's `-fvk-*-shift` options and the exact argument form must be checked against `dxc --help`. The two-argument `<N> <space>` form I saw came from Slang's documentation.
+- **Structured outputs.** Anthropic's structured-output feature appeared as both beta and generally available in different pages. **VERIFY** the current state in the official docs before coding against it.
+- **PSSL and console dialects.** I found no public documentation, which is expected because of NDAs. The plan does not depend on it.
+
+---
+
+## Phase 1: Repository foundation
+
+Goal: a clean, buildable, tested, documented empty project that other phases can build on.
+
+**Progress:** implemented and verified locally (`make check`: ruff, mypy strict, 9 tests passing; pre-commit hooks pass; `uv` and plain `pip install -e .` both work). CI first ran on pull request #1 and, after fixes, passed on Linux, macOS and Windows (Python 3.11 to 3.13); POSIX-only tests are skipped on Windows. Decisions D1 to D9 were taken at their defaults, with the copyright holder set to "ShaderFlux-AI contributors" (D7), which is easy to change.
+
+### 1.1 Legal and project files
+- [x] 1.1.1 Add `LICENSE` (MIT) once D7 gives the copyright holder.
+- [ ] 1.1.2 Add `NOTICE`/`THIRD_PARTY.md` listing external tools (DXC, SPIRV-Cross, SPIRV-Tools, glslang) with their licenses. **VERIFY** each license from its repository. *(Partial: `THIRD_PARTY.md` created; licenses still unverified, to be checked in 2.1.2.)*
+- [x] 1.1.3 Add `CODE_OF_CONDUCT.md` (Contributor Covenant).
+- [x] 1.1.4 Add `SECURITY.md` (how to report vulnerabilities, supported versions).
+- [x] 1.1.5 Add `CONTRIBUTING.md` (setup, test commands, commit style, how to add a test shader).
+- [x] 1.1.6 Add `CHANGELOG.md` using Keep a Changelog format.
+- [x] 1.1.7 Add `.gitignore` (Python, build outputs, caches, `.env`, `*.spv` outputs in scratch dirs).
+- [x] 1.1.8 Add `.editorconfig`.
+- **Acceptance:** files exist, README links resolve, license matches README.
+
+### 1.2 Python packaging
+- [x] 1.2.1 Create `pyproject.toml` with project metadata, Python `>=3.11`, entry point `shaderflux`.
+- [x] 1.2.2 Choose layout: `src/shaderflux/` with `__init__.py` and `py.typed`.
+- [x] 1.2.3 Declare dependencies: `typer`, `pydantic`, `rich`, `anthropic`, `tomli-w` (if config is written), `platformdirs`. *(Done without `tomli-w`; add it when config writing is implemented.)*
+- [x] 1.2.4 Declare dev dependencies: `pytest`, `pytest-cov`, `ruff`, `mypy` (or `pyright`), `pre-commit`, `hypothesis` (optional). *(Done without `hypothesis`; it was optional.)*
+- [x] 1.2.5 Add `shaderflux --version` reading from package metadata.
+- [x] 1.2.6 Verify `uv sync` (or chosen tool) and `pip install -e .` both work in a clean venv.
+- **Acceptance:** fresh clone to working `shaderflux --version` in under 5 commands.
+
+### 1.3 Quality tooling
+- [x] 1.3.1 Configure ruff (lint + format) in `pyproject.toml`.
+- [x] 1.3.2 Configure type checking in strict mode for `src/`.
+- [x] 1.3.3 Configure pytest: test paths, markers (`unit`, `integration`, `needs_tools`, `needs_llm`, `needs_gpu`), default to skipping the last three.
+- [x] 1.3.4 Add `pre-commit` config (ruff, trailing whitespace, end-of-file, large-file check).
+- [x] 1.3.5 Add a `Makefile` or `justfile` with `setup`, `lint`, `type`, `test`, `test-all`.
+- **Acceptance:** `make lint type test` passes on the empty skeleton.
+
+### 1.4 Continuous integration
+- [x] 1.4.1 GitHub Actions workflow: lint, type check, unit tests on Python 3.11, 3.12, 3.13.
+- [x] 1.4.2 Matrix over `ubuntu-latest`, `windows-latest`, `macos-latest` for unit tests (shader tools tests only on Linux at first).
+- [ ] 1.4.3 Second workflow: integration tests with shader tools installed (see 2.1 for how tools are obtained). Runs on push to main and on PRs touching `src/` or `tests/`. *(Deferred to 2.1.4: needs a decision on how CI obtains the shader tools.)*
+- [ ] 1.4.4 Cache pip and tool downloads. *(Not done: tool-download caching belongs with 2.1.4; pip caching to be confirmed.)*
+- [x] 1.4.5 Upload coverage and test artifacts.
+- [ ] 1.4.6 Add a scheduled weekly job that runs the integration suite against the latest tool versions, so tool drift is detected early. *(Deferred to 2.1.4, together with 1.4.3.)*
+- [x] 1.4.7 Add Dependabot (or Renovate) for Python deps and GitHub Actions.
+- [ ] 1.4.8 Add status badges to the README only after the workflows are green. *(Pending: add badges after the first green run on `main`.)*
+- **Acceptance:** green CI on a PR that only adds the skeleton.
+
+### 1.5 Repository templates
+- [x] 1.5.1 Issue templates: bug report (with `shaderflux doctor` output field), porting problem report, feature request.
+- [x] 1.5.2 Pull request template (what, why, tests, docs).
+- [ ] 1.5.3 Labels: `good first issue`, `needs-repro`, `shader-corpus`, `llm`, `tooling`, `docs`. *(Pending: labels must be created in the GitHub repository settings.)*
+- **Acceptance:** templates appear in the GitHub UI.
+
+### 1.6 Directory skeleton
+*(This was the initial layout. The code was later restructured into a one-way stack with new `source` and `workflows` packages; the current layout and the test that enforces it are described in `docs/architecture.md`.)*
+```
+src/shaderflux/
+  cli/            command definitions
+  core/           models, config, errors, logging
+  tools/          external tool backends (dxc, spirv_cross, ...)
+  pipeline/       routing, includes, orchestration
+  analysis/       reflection, bindings, lint rules
+  llm/            provider interface, prompts, repair loop
+  verify/         compile checks, reflection diff, image diff
+  reporting/      report models and renderers
+tests/
+  unit/  integration/  corpus/
+docs/
+  PLAN.md  architecture.md  guides/
+examples/
+```
+- [x] 1.6.1 Create empty packages with docstrings stating each package's responsibility.
+- [x] 1.6.2 Add `docs/architecture.md` with the pipeline diagram from the README and the package responsibilities.
+- **Acceptance:** `import shaderflux.<pkg>` works for every package.
+
+---
+
+## Phase 2: External tool layer
+
+Goal: reliable, testable access to the compilers and validators, with clear errors when they are missing.
+
+**Phase 2 progress (updated):** the DXC backend is now exercised against a real DXC 1.9 in CI (job `dxc-tests`, Linux release), and that run found a real bug (the SPIRV-Cross default of Shader Model 3 HLSL, now fixed). Locally no `dxc` is available, so the DXC tests skip there.
+
+**Phase 2 progress (earlier):** the runner, discovery, `doctor`, backend interfaces, glslang/glslc, SPIRV-Cross and SPIRV-Tools backends are implemented and tested against the real tools (Ubuntu packages). The DXC backend is implemented but **unverified**, because `dxc` could not be installed in the development environment. Real-tool findings are in `docs/tools.md`.
+
+### 2.1 Tool inventory and acquisition
+- [x] 2.1.1 List tools to support: `dxc`, `spirv-cross`, `spirv-val`, `spirv-opt`, `spirv-dis`, `spirv-as`, `glslangValidator` and/or `glslc`. Optional later: `slangc`, `naga`, `tint`.
+- [ ] 2.1.2 For each tool record: purpose, license (**VERIFY**), how users install it (package manager, Vulkan SDK, release binary), and the minimum version we test against. *(Partial: inventory and install hints are in `docs/tools.md` and `THIRD_PARTY.md`; licenses still unverified.)*
+- [ ] 2.1.3 Check maintenance status for each (last release date, recent commits, open critical issues). Record the result in `docs/tools.md`. This resolves the unconfirmed claims in 0.4. *(Not done: web evidence for SPIRV-Cross and ShaderConductor activity was inconclusive.)*
+- [ ] 2.1.4 Decide how CI gets the tools: Vulkan SDK download, distro packages, or release binaries from the projects' GitHub releases. Pin versions and checksums. *(Not done: needs a decision (Vulkan SDK download vs distro packages vs release binaries). Ubuntu's `spirv-cross` is a 2021 build.)*
+- [ ] 2.1.5 Write `scripts/install_tools_ci.sh` for Linux and equivalents for Windows and macOS only if needed.
+- **Acceptance:** CI can run `dxc --version` and `spirv-cross --help` on Linux.
+
+### 2.2 Subprocess runner
+- [x] 2.2.1 Implement `run_tool(args, input=None, timeout, cwd, env)` returning `ToolRun(returncode, stdout, stderr, duration, command)`.
+- [x] 2.2.2 Never use `shell=True`. Pass argument lists only. Reject paths containing NUL.
+- [x] 2.2.3 Enforce a timeout and kill the whole process group on timeout.
+- [x] 2.2.4 Cap captured output size to avoid memory blowups from runaway tools.
+- [x] 2.2.5 Run in a fresh temp directory per invocation. Clean it up on success and optionally keep it with `--keep-temp`. *(`workspace(keep=...)` exists; the `--keep-temp` CLI flag is wired in phase 8.)*
+- [x] 2.2.6 Redact home directory and API-key-like strings from stored command lines.
+- [x] 2.2.7 Unit tests with a fake executable (small Python script) for: success, non-zero exit, timeout, huge output, missing binary.
+- **Acceptance:** all failure modes produce typed errors, never hangs or tracebacks.
+
+### 2.3 Tool discovery and `doctor`
+- [x] 2.3.1 Discover tools via config path, then `PATH`, then well-known locations (`VULKAN_SDK`).
+- [x] 2.3.2 Query each tool's version and parse it into a comparable structure.
+- [ ] 2.3.3 Compare with the tested range. Warn on untested versions. Error below the minimum. *(Partial: minimum-version check is implemented, but no minimums are set yet because no version has been tested as a floor.)*
+- [x] 2.3.4 Implement `shaderflux doctor` printing a table: tool, path, version, status, install hint per OS.
+- [x] 2.3.5 Add `--json` output for bug reports.
+- [x] 2.3.6 Unit tests with mocked version outputs.
+- **Acceptance:** on a machine with no tools, `doctor` lists each missing tool with an install hint and exits non-zero.
+
+### 2.4 Backend interfaces
+- [x] 2.4.1 Define `CompilerBackend` protocol: `compile(source, stage, entry, defines, includes, target) -> CompileResult`.
+- [x] 2.4.2 Define `CrossCompilerBackend`: `convert(spirv, target_lang, options) -> ConvertResult`.
+- [x] 2.4.3 Define `ValidatorBackend`: `validate(spirv, env) -> list[Diagnostic]`.
+- [x] 2.4.4 `CompileResult` carries output bytes/text, diagnostics, tool name, version, exact command.
+- [x] 2.4.5 Registry so a backend can be swapped or added without touching the pipeline.
+- **Acceptance:** a fake backend can be registered in tests and used by the pipeline.
+
+### 2.5 DXC backend
+- [x] 2.5.1 HLSL to DXIL compile (for "does this compile for D3D12" checks). *(Verified against DXC 1.9 in CI (job `dxc-tests`, `tests/integration/test_dxc.py`): HLSL compiles to DXIL.)*
+- [x] 2.5.2 HLSL to SPIR-V compile with `-spirv` and a configurable target environment (for example Vulkan 1.2). **VERIFY** flag names with `dxc --help`. *(Verified against DXC 1.9 in CI (job `dxc-tests`, `tests/integration/test_dxc.py`): HLSL compiles to valid SPIR-V.)*
+- [x] 2.5.3 Pass entry point, stage profile (`vs_6_x`, `ps_6_x`, `cs_6_x`...), defines, include dirs.
+- [x] 2.5.4 Map binding options (`-fvk-b-shift`, `-fvk-t-shift`, `-fvk-s-shift`, `-fvk-u-shift`, `-fvk-bind-register`) from our own `BindingPolicy` model. **VERIFY** exact syntax and the note that shift and bind-register options cannot be combined. *(Verified against DXC 1.9 in CI (job `dxc-tests`, `tests/integration/test_dxc.py`): the shift flags are accepted, and the proposed flags really separate the bindings (`docs/pain-points.md`).)*
+- [ ] 2.5.5 Support `[[vk::binding]]` attribute inspection (read, not rewrite) for later analysis. *(Moved to 4.2.1 (source analysis).)*
+- [x] 2.5.6 Parse DXC diagnostics (file, line, column, severity, message) into `Diagnostic`. *(Verified against DXC 1.9 in CI (job `dxc-tests`, `tests/integration/test_dxc.py`): a compile error is reported with file, line and column.)*
+- [ ] 2.5.7 Golden tests: five tiny shaders (vertex passthrough, textured pixel, constant buffer, compute with UAV, one that fails to compile). *(Not done: needs real `dxc`. Corpus shaders and `tests/integration/test_dxc.py` are ready and skip until it is installed.)*
+- **Acceptance:** each golden shader compiles or fails as expected, with parsed diagnostics.
+
+### 2.6 SPIRV-Cross backend
+- [x] 2.6.1 SPIR-V to GLSL with version and Vulkan-semantics options.
+- [x] 2.6.2 SPIR-V to HLSL with shader model option.
+- [ ] 2.6.3 SPIR-V to MSL (kept optional, not in first release scope). *(Argument building implemented; no real MSL conversion has been run or tested yet.)*
+- [x] 2.6.4 SPIR-V reflection output (JSON) for the analysis phase.
+- [x] 2.6.5 Parse tool errors into diagnostics.
+- [ ] 2.6.6 Golden tests converting the DXC outputs from 2.5.7. *(Partial: a GLSL-derived module is converted to GLSL and HLSL and round-trips. DXC-derived modules wait for real `dxc`.)*
+- **Acceptance:** converted GLSL from golden SPIR-V compiles with glslang (2.8).
+
+### 2.7 SPIRV-Tools backend
+- [x] 2.7.1 `spirv-val` wrapper with target environment option.
+- [x] 2.7.2 `spirv-opt` wrapper (optional, off by default; used only when asked).
+- [x] 2.7.3 `spirv-dis` wrapper for human-readable diffs in reports.
+- [x] 2.7.4 Validation diagnostics parser.
+- **Acceptance:** an intentionally broken SPIR-V file produces a diagnostic with the offending instruction.
+
+### 2.8 glslang / glslc backend
+- [x] 2.8.1 GLSL to SPIR-V compile with stage, `#version`, defines, include dirs.
+- [x] 2.8.2 Decide which binary to support first (`glslangValidator` vs `glslc`). Support the one that is easier to install in CI first.
+- [x] 2.8.3 Diagnostics parser.
+- [x] 2.8.4 Golden tests for three GLSL shaders (vertex, fragment, compute).
+- **Acceptance:** GLSL input flows to SPIR-V and onward to HLSL through 2.6.
+
+### 2.9 Optional alternative backends (not in first release)
+- [ ] 2.9.1 Spike: Slang as an alternative route (HLSL/Slang source to SPIR-V/HLSL/GLSL/MSL). Compare output quality against the DXC chain on the corpus. **VERIFY** license first.
+- [ ] 2.9.2 Spike: Naga and Tint for WGSL targets.
+- [ ] 2.9.3 Write the findings in `docs/tools.md`. Decide whether to include.
+- **Acceptance:** written decision with data, not opinion.
+
+---
+
+## Phase 3: Core model and deterministic pipeline
+
+Goal: translate shaders end to end with no LLM, whenever the tool chain can do it.
+
+**Phase 3 progress:** 3.1 to 3.6 and the `translate` command (3.7.1) are implemented. GLSL input works end to end with the real tools (GLSL to HLSL, GLSL to GLSL with `--roundtrip`, GLSL to SPIR-V). HLSL input needs `dxc`, which is **unverified** (see Phase 2). The milestone M1 acceptance ("deterministic HLSL to GLSL/SPIR-V on a 10-shader corpus") is therefore **not met yet**: the corpus has about 8 small shaders and no HLSL translation has run against a real DXC.
+
+### 3.1 Domain models
+- [x] 3.1.1 `ShaderLanguage` enum: `hlsl`, `glsl`, `spirv`, later `msl`, `wgsl`.
+- [x] 3.1.2 `ShaderStage` enum: vertex, fragment/pixel, compute, geometry, tessellation control/eval, mesh, task, ray stages (later).
+- [x] 3.1.3 `ShaderSource`: path, text, language, stage, entry point, defines, include dirs, content hash.
+- [x] 3.1.4 `Target`: language, version or shader model, API environment (Vulkan x.y, D3D12).
+- [x] 3.1.5 `Diagnostic`: severity, message, file, line, column, code, source tool.
+- [x] 3.1.6 `TranslationResult` and `StageResult` records, JSON serialisable.
+- [x] 3.1.7 Typed error hierarchy: `ToolMissing`, `ToolFailed`, `InvalidInput`, `UnsupportedRoute`, `LlmError`, `VerificationFailed`.
+- **Acceptance:** models round-trip through JSON in unit tests.
+
+### 3.2 Configuration
+- [x] 3.2.1 Config file `shaderflux.toml` in project root, with user-level defaults from a platform config dir.
+- [x] 3.2.2 Precedence: CLI flags, environment, project file, user file, defaults.
+- [x] 3.2.3 Settings: tool paths, default targets, include dirs, binding policy, LLM on/off, model name, max repair attempts, cache dir, report dir. *(All listed settings exist; default targets and binding policy are not settings yet, and `tool_timeout_s`, `report_dir` and `llm.*` are not consumed until later phases.)*
+- [x] 3.2.4 `shaderflux config show` prints the effective config with the source of each value.
+- [x] 3.2.5 API key is read only from the environment (or OS keyring later), never stored in the config file.
+- **Acceptance:** precedence order covered by tests.
+
+### 3.3 Input handling
+- [x] 3.3.1 Detect language from extension (`.hlsl`, `.fx`, `.glsl`, `.vert`, `.frag`, `.comp`, `.spv`) with an explicit `--from` override.
+- [x] 3.3.2 Detect stage from extension or `#pragma`/attribute hints, with `--stage` override.
+- [x] 3.3.3 Detect entry point (HLSL: look for `[shader("...")]` or ask; default `main`). *(`find_entry_candidates` exists; the CLI uses `--entry` or `main` and does not prompt yet.)*
+- [x] 3.3.4 Handle UTF-8 with and without BOM, CRLF and LF. Reject binary input for text languages.
+- [x] 3.3.5 Size limits with a clear error.
+- **Acceptance:** detection table tested with at least 20 filenames and snippets.
+
+### 3.4 Include and macro resolution
+- [x] 3.4.1 Build an include graph for `#include "..."` and `<...>`, with search paths.
+- [x] 3.4.2 Detect cycles and missing files with precise diagnostics.
+- [x] 3.4.3 Produce a flattened single-file view for the LLM and a path-preserving view for compilers.
+- [x] 3.4.4 Track `#define` inputs from CLI and config; record the effective defines in the report. *(Defines are part of the input hash; listing them in a report waits for phase 8.)*
+- [x] 3.4.5 Use the compiler's own preprocessor output where available rather than writing a custom preprocessor. Write a tiny conservative parser only for the include graph.
+- **Acceptance:** a three-file shader with a cycle and a missing include yields the right diagnostics.
+
+### 3.5 Route planner
+- [x] 3.5.1 Define the conversion graph: nodes are languages, edges are backend operations (HLSL to SPIR-V via DXC, GLSL to SPIR-V via glslang, SPIR-V to GLSL/HLSL/MSL via SPIRV-Cross).
+- [x] 3.5.2 Find the shortest valid route between source and target, or raise `UnsupportedRoute` with a helpful message.
+- [x] 3.5.3 For HLSL to HLSL (for example SM 5 to SM 6), route through SPIR-V only if the user asks, since round-tripping can change code shape.
+- [x] 3.5.4 Record each hop in the result for the report. *(Each hop appears as a named stage in the result; the planned route is also logged at debug level.)*
+- **Acceptance:** route table test for all supported pairs.
+
+### 3.6 Orchestrator
+- [x] 3.6.1 `translate(source, target, options) -> TranslationResult` for the deterministic path only.
+- [x] 3.6.2 Stop at the first failing hop and keep partial outputs.
+- [x] 3.6.3 Write outputs atomically (temp file then rename).
+- [x] 3.6.4 Never overwrite an existing output without `--force`.
+- [x] 3.6.5 Content-hash cache: skip work if input, options and tool versions are unchanged.
+- [x] 3.6.6 Structured logging with a run ID.
+- **Acceptance:** golden HLSL shader translates to GLSL and the GLSL compiles back to SPIR-V that validates.
+
+### 3.7 First vertical slice (milestone M1)
+- [x] 3.7.1 Wire `shaderflux translate in.hlsl --to glsl --stage fragment` to the orchestrator, no LLM.
+- [ ] 3.7.2 Manual test on five real-world-style shaders written for the corpus. *(Not done: needs real-world-style shaders, and HLSL ones need a real `dxc`.)*
+- [ ] 3.7.3 Record what failed. This list drives Phase 5 and 6 priorities. *(Not done (depends on 3.7.2).)*
+- **Acceptance:** M1 demo recorded as a terminal session in `docs/`.
+
+---
+
+## Phase 4: Analysis (reflection, bindings, conventions)
+
+Goal: understand a shader well enough to catch porting problems before and after conversion.
+
+**Phase 4 progress:** reflection, binding analysis, matrix and intrinsic rules, and the `lint` / `explain` commands exist and are tested. Evidence for each rule is in `docs/matrix-conventions.md` and `docs/pain-points.md`. The AST spike (4.5) is not started.
+
+**Review pass (after phase 6):** a self-review found and fixed these, each with a regression test: (1) a quadratic-backtracking regex made `lint` hang for minutes on a crafted 60 KB file, and per-match line counting made big files quadratic; both are now linear, with hard size and line-length limits (`LNT001`); (2) the first regression test for (1) could not fail because the new line limit short-circuited it, so it was rewritten to call the rules directly and shown to fail on the old code; (3) file names starting with `-` were read by compilers as options; (4) child processes inherited secrets such as `ANTHROPIC_API_KEY`; (5) `translate` checked `--out` only after a paid repair finished; (6) several README claims were stale or too strong.
+
+### 4.1 Reflection
+- [x] 4.1.1 Extract from SPIR-V: entry points, stage, inputs/outputs with locations, descriptor sets and bindings, resource types (UBO, SSBO, textures, samplers, storage images), push constants, workgroup size.
+- [x] 4.1.2 Use SPIRV-Cross JSON reflection first. Evaluate SPIRV-Reflect as an alternative only if the JSON is insufficient.
+- [x] 4.1.3 Normalise into a `Reflection` model that is independent of the tool.
+- [x] 4.1.4 Extract uniform block member names, types, offsets and array strides.
+- [x] 4.1.5 Tests against golden SPIR-V with hand-written expected reflection.
+- **Acceptance:** reflection of the five golden shaders matches expectations.
+
+### 4.2 Binding analysis
+- [x] 4.2.1 Parse HLSL `register(...)` and `[[vk::binding]]` from source (conservative parser, report "could not parse" rather than guessing). *(`register(...)` and `[[vk::binding]]` are parsed; unparsed constructs are skipped silently, not reported yet.)*
+- [ ] 4.2.2 Build a `BindingMap` from source registers to target set/binding. *(Not done as a model: the default and shifted slots are computed inside `find_collisions`.)*
+- [x] 4.2.3 Detect collisions (two resources mapped to the same slot) and gaps.
+- [x] 4.2.4 Detect register-type mixing (`b`, `t`, `s`, `u`) that DXC maps onto one binding number space by default. **VERIFY** the default behaviour with an experiment (DXC docs say the register type is ignored, which can cause overlap). *(Verified against DXC 1.9 in CI (job `dxc-tests`, `tests/integration/test_dxc.py`): by default DXC puts resources of different register types on the same binding.)*
+- [x] 4.2.5 Provide a `BindingPolicy` (shift per register type, explicit overrides) and a function that proposes one automatically.
+- [ ] 4.2.6 Emit a human-readable binding table in the report. *(Not done: findings name the colliding resources and the fix; a full table waits for the report phase.)*
+- **Acceptance:** a shader with overlapping `b0`/`t0` is flagged, and the proposed policy removes the overlap.
+
+### 4.3 Matrix and convention analysis
+- [ ] 4.3.1 **Research spike with experiments.** Write tiny HLSL and GLSL shaders and inspect the reflected offsets and the generated code to build a verified table covering: storage order in constant buffers, `row_major`/`column_major` qualifiers, `#pragma pack_matrix`, how DXC and SPIRV-Cross treat matrix dimensions (an HLSL `float2x3` versus a GLSL `mat2x3`), and `mul` argument order. Output: `docs/matrix-conventions.md` with evidence for every row. *(Mostly done: GLSL/SPIRV-Cross side and DXC 1.9 side are in `docs/matrix-conventions.md`. `#pragma pack_matrix(row_major)` is confirmed to flip the default. Still open: `-fvk-use-gl-layout`, other DXC versions and Windows DXC.)*
+- [x] 4.3.2 Define lint rules from that table, for example: `mul` used with a vector on the left versus right, matrix declared without an explicit qualifier in a shared buffer, matrix constructed from rows or columns, use of `transpose` near uploads.
+- [x] 4.3.3 Implement a token-based detector first (fast, no AST). Move to an AST only if the experiments show false positives or negatives that need it (see 4.5).
+- [x] 4.3.4 Each finding carries: rule ID, location, explanation, suggested fix, and confidence.
+- [ ] 4.3.5 Test corpus: for each rule, one positive and one negative example. *(Partial: most rules have positive and negative tests. A 9-shader corpus written by the project authors scores 100% precision and recall (`tests/unit/test_lint_corpus.py`), which is a regression guard, not independent evidence; MAT003 and MAT005 still lack a negative unit test.)*
+- **Acceptance:** rule precision and recall measured on the corpus and recorded; no rule ships without a negative test.
+
+### 4.4 Feature and intrinsic compatibility
+- [x] 4.4.1 Build a data file (`data/intrinsics.toml`) mapping HLSL intrinsics and GLSL built-ins to equivalents, with notes and "no equivalent" entries. Source from official docs and cite them.
+- [ ] 4.4.2 Detect usage of intrinsics, semantics (`SV_*`) and extensions that the chosen target cannot express. *(Partial: only the flagged intrinsics are detected; SV_* semantics and unsupported extensions are not.)*
+- [ ] 4.4.3 Detect target-version issues (for example features that need a newer `#version` or Vulkan environment). *(Not done.)*
+- [x] 4.4.4 Report each as a finding with a suggested remedy.
+- **Acceptance:** at least 30 intrinsics covered with a test each.
+
+### 4.5 AST evaluation spike
+The original README promised AST analysis. Evaluate before committing.
+- [ ] 4.5.1 Try tree-sitter grammars for HLSL and GLSL on the corpus. Measure parse success rate.
+- [ ] 4.5.2 Try DXC's AST dump (if available in the version we pin) and Clang-style output parsing. **VERIFY** it exists in the shipped binary.
+- [ ] 4.5.3 Compare against the token-based detector from 4.3.3 on the same rules.
+- [ ] 4.5.4 Decide: adopt, adopt for specific rules only, or drop. Write the decision with numbers.
+- **Acceptance:** a decision record in `docs/decisions/`.
+
+### 4.6 `lint` command (milestone M2)
+- [x] 4.6.1 `shaderflux lint file --target vulkan` runs 4.2 to 4.4 and prints findings grouped by severity.
+- [x] 4.6.2 `--json` and SARIF output so results show up in code scanning tools.
+- [x] 4.6.3 Exit codes: 0 clean, 1 findings above threshold, 2 error.
+- **Acceptance:** lint of the corpus is stable and documented.
+
+---
+
+## Phase 5: LLM layer
+
+Goal: a safe, testable, cost-aware way to ask Claude for help.
+
+**Phase 5 and 6 progress:** the provider interface, the Anthropic provider, schemas, versioned prompts, context building, the safe patch applier, the repair loop and `translate --repair` exist, with 60+ offline tests using a scripted fake model against fake and real compilers. **The live API path has not been exercised** (no API key here), so prompt quality, real-model success rates and the exact fallback behaviour are unknown. Task 6.3.2 to 6.3.5 (binding, convention, intrinsic and explain tasks) are not built.
+
+### 5.1 Provider interface
+- [x] 5.1.1 Define `LlmProvider` protocol: `complete(request) -> LlmResponse` with token usage and stop reason.
+- [ ] 5.1.2 Implement `AnthropicProvider` using the official SDK. *(Implemented in `llm/anthropic_provider.py` and tested with a fake client for request shape and error mapping, but **never run against the live API** (no key in the development environment).)*
+- [x] 5.1.3 Implement `FakeProvider` that replays recorded responses from fixture files, used in all unit tests.
+- [ ] 5.1.4 Record-and-replay tool: run once against the real API, save request/response pairs, replay in CI with no network. *(Not done.)*
+- [x] 5.1.5 Retries with backoff for transient errors, no retry for auth or invalid-request errors. *(Done by relying on the SDK's built-in retry (2 retries on 408/409/429/5xx); not separately tested.)*
+- [ ] 5.1.6 Timeouts and a per-run cost/token ceiling that aborts cleanly. *(Partial: a per-run token ceiling exists (`max_total_tokens`); the timeout is the SDK default.)*
+- **Acceptance:** the repair loop (Phase 6) runs fully offline in CI with the fake provider.
+
+### 5.2 Model configuration
+- [x] 5.2.1 Model name is a config value, not hardcoded in logic. Look up current model IDs in the official docs at implementation time.
+- [ ] 5.2.2 Allow separate models for cheap tasks (explanations, classification) and hard tasks (repairs). *(Not done.)*
+- [ ] 5.2.3 Record model name and parameters in every report. *(Not done: the model name is returned by the provider but not recorded in a report yet.)*
+- **Acceptance:** changing the model requires only a config change.
+
+### 5.3 Structured output
+- [x] 5.3.1 **VERIFY** the current official structured-output or strict tool-use mechanism and its limits in Anthropic's docs.
+- [ ] 5.3.2 Define response schemas: `PatchProposal` (list of edits with file, range, replacement, reason), `Explanation`, `BindingSuggestion`. *(Partial: `PatchProposal` exists; `Explanation` and `BindingSuggestion` do not.)*
+- [x] 5.3.3 Validate every response with Pydantic. On schema failure, retry once with the validation error, then fail cleanly.
+- [x] 5.3.4 Never execute or interpret free text from the model as commands.
+- **Acceptance:** malformed fixture responses are rejected in tests.
+
+### 5.4 Prompt design
+- [x] 5.4.1 Store prompts as versioned template files in `src/shaderflux/llm/prompts/`, not inline strings.
+- [ ] 5.4.2 One prompt per task: repair compile error, fix binding layout, fix convention finding, explain a diff. *(Partial: only the compile-error repair prompt exists.)*
+- [x] 5.4.3 Each prompt states: the task, the source and target languages and versions, the exact diagnostics, the rules ("change as little as possible", "do not rename public symbols", "output edits only").
+- [ ] 5.4.4 Include small, verified few-shot examples taken from the corpus. *(Not done.)*
+- [x] 5.4.5 Treat shader source as data: delimit it clearly and instruct the model to ignore any instructions embedded in comments or strings. Add tests with adversarial comments.
+- [x] 5.4.6 Prompt version number is recorded in reports.
+- **Acceptance:** prompt changes are reviewed like code and covered by replay tests.
+
+### 5.5 Context management
+- [ ] 5.5.1 Estimate tokens before sending. Use the SDK's token counting if available. *(Not done: the size budget is in characters, not tokens.)*
+- [x] 5.5.2 Build the smallest sufficient context: the failing file, the included files it actually uses, the diagnostics, the relevant reflection summary.
+- [x] 5.5.3 When over budget, truncate by dropping unused includes and function bodies unrelated to the error lines, and say so in the prompt.
+- [ ] 5.5.4 Use prompt caching for large stable prefixes (instructions, examples). **VERIFY** current caching semantics in the official docs. *(Not done.)*
+- **Acceptance:** a 5-file shader project fits a configured budget and the log shows what was trimmed.
+
+### 5.6 Privacy and safety controls
+- [x] 5.6.1 LLM features are off unless `--llm` or config enables them and a key exists.
+- [x] 5.6.2 `--dry-run` prints exactly what would be sent, without sending.
+- [ ] 5.6.3 Optional redaction hooks (strip comments, replace string literals) before sending. *(Not done.)*
+- [x] 5.6.4 Never send environment variables, absolute paths, or files outside the shader's include graph.
+- [x] 5.6.5 Document data handling in `docs/privacy.md`.
+- **Acceptance:** a test asserts that a file outside the include graph never appears in a request.
+
+### 5.7 Cost and usage reporting
+- [ ] 5.7.1 Track input/output tokens per call and total per run. *(Partial: tokens are counted and shown; cache tokens are read but not summarised.)*
+- [ ] 5.7.2 Estimate cost from a configurable price table (do not hardcode prices as facts). *(Not done.)*
+- [ ] 5.7.3 Show usage at the end of each run and in the report. *(Partial: shown in the CLI after a repair; not in a report file yet.)*
+- **Acceptance:** the totals in the report match the sum of recorded calls.
+
+---
+
+## Phase 6: Repair loop and guided transformations
+
+Goal: use the LLM to fix what the tools cannot, with strict guardrails.
+
+### 6.1 Patch format and application
+- [x] 6.1.1 Represent edits as line-range replacements with expected original text, so stale edits are detected.
+- [x] 6.1.2 Apply patches to a copy, never to the original file in place.
+- [x] 6.1.3 Reject patches that touch lines outside the allowed files.
+- [x] 6.1.4 Reject patches larger than a configurable fraction of the file unless `--allow-large-edits`.
+- [x] 6.1.5 Produce a unified diff for the report.
+- **Acceptance:** overlapping, stale and out-of-range patches are rejected in tests.
+
+### 6.2 Repair loop
+- [x] 6.2.1 Loop: run pipeline, collect diagnostics, ask LLM for a patch, apply, re-run. Stop on success, on attempt cap, on no progress, or on budget.
+- [x] 6.2.2 "No progress" detection: same diagnostics (after normalising line numbers) twice in a row, or an oscillation between two states.
+- [ ] 6.2.3 Keep every attempt's source, diagnostics and diff for the report. *(Attempts are kept in memory and printed; they are not written to a report file yet.)*
+- [x] 6.2.4 Prefer fixing the first error and re-compiling over fixing everything at once, since later errors are often caused by the first.
+- [x] 6.2.5 Never accept a patch that makes the number of errors increase, unless it is the only change available (flag it).
+- **Acceptance:** with the fake provider, a scripted three-step repair converges and a scripted loop is stopped by the cap.
+
+### 6.3 Targeted tasks
+Each task is a prompt + a verifier.
+- [ ] 6.3.1 **Compile error repair.** Input: source, diagnostics. Verifier: the compiler. *(Implemented and tested with a scripted model and the real compilers; **not yet run against the live model**.)*
+- [ ] 6.3.2 **Binding remap.** Input: source, binding table, collisions. Verifier: reflection shows no collisions and expected set/binding.
+- [ ] 6.3.3 **Convention fix.** Input: a lint finding from 4.3. Verifier: re-run the lint rule plus the numeric test in 7.4 where possible.
+- [ ] 6.3.4 **Missing intrinsic replacement.** Input: the intrinsic entry from 4.4. Verifier: compile, plus numeric test where possible.
+- [ ] 6.3.5 **Explain diff.** Input: original and final source. Output: short, plain-language reasons for each change. No verifier, labelled as generated text.
+- **Acceptance:** each task has at least three corpus cases with replayable fixtures.
+
+### 6.4 `translate` with repair (milestone M3)
+- [x] 6.4.1 `shaderflux translate` runs the deterministic path first and uses the repair loop only on failure or lint findings the user opted into.
+- [ ] 6.4.2 Start the optional repair from a user-supplied compiler log. *(Not done; `shaderflux fix` is the deterministic, no-AI command and does not take a log.)*
+- [ ] 6.4.3 Both commands end with a report (Phase 8). *(Not done: reports are phase 8.)*
+- **Acceptance:** at least 70% of the "needs repair" corpus cases converge with the real model (target to be revisited after the first measurement, see Phase 10).
+
+---
+
+## Phase 7: Verification
+
+Goal: back every claim of success with evidence.
+
+**Phase 7/8 progress:** the output re-check (`verify/recompile.py`), the verdict (`verify/levels.py`) and run reports (`reporting/report.py`, `translate --report`) exist and are tested. Reflection comparison, numeric and image checks, batch mode and the remaining commands are not built. A real finding from the re-check: GLSL generated without `--vulkan` does not always compile as Vulkan GLSL (`tests/corpus/glsl/rich.frag`).
+
+### 7.1 Verification levels
+- [ ] 7.1.1 Level 0: output exists and parses. *(The levels in `verify/levels.py` differ slightly from this list: 1 = source compiled, 2 = SPIR-V validated, 3 = generated output compiled again. Reflection comparison (old level 3) and numeric or image comparison (level 4) are not built.)*
+- [ ] 7.1.2 Level 1: output compiles with the target's compiler. *(Done for GLSL output (`--recheck`, on by default, compiles the generated GLSL again with glslang or glslc). For HLSL output it needs `dxc`, so it is skipped with a warning here.)*
+- [x] 7.1.3 Level 2: SPIR-V validates with `spirv-val` for the target environment.
+- [ ] 7.1.4 Level 3: reflection of the output matches the source's reflection (see 7.2).
+- [ ] 7.1.5 Level 4: numeric or image comparison passes (7.3, 7.4).
+- [x] 7.1.6 The report states the highest level reached.
+- **Acceptance:** each level has a passing and a failing test.
+
+### 7.2 Reflection equivalence
+- [ ] 7.2.1 Compare interface: inputs/outputs by location and type, resource types and counts, uniform block layout.
+- [ ] 7.2.2 Allow expected differences (renamed symbols, reordered members when the policy allows it) via a configurable comparison.
+- [ ] 7.2.3 Produce a readable diff of mismatches.
+- **Acceptance:** a deliberately mismatched translation is caught.
+
+### 7.3 Software-rendering comparison
+- [ ] 7.3.1 Evaluate lavapipe and SwiftShader as headless Vulkan implementations. Check install effort in CI and conformance caveats. Lavapipe states it is not conformant and is for testing use.
+- [ ] 7.3.2 Write a minimal headless harness (own small runner or an existing library) that renders a full-screen triangle with a fragment shader and reads back pixels. Decide between a C++ helper binary and a Python Vulkan binding.
+- [ ] 7.3.3 Define a fixed set of test inputs: textures, constants, resolution.
+- [ ] 7.3.4 Render both the original (compiled to SPIR-V) and the translated shader. Compare per-pixel with a tolerance and report max and mean error.
+- [ ] 7.3.5 Handle nondeterminism (derivatives, uninitialised values) by documenting unsupported cases.
+- [ ] 7.3.6 This is optional and marked `needs_gpu`/`needs_vulkan_sw` in tests.
+- **Acceptance:** one fragment shader is rendered identically through two routes in CI.
+
+### 7.4 Numeric checks for pure math
+- [ ] 7.4.1 For functions with matrix math, generate a small compute shader that evaluates them on fixed inputs and writes to a buffer.
+- [ ] 7.4.2 Run original and translated versions on the software Vulkan implementation, compare outputs with tolerance.
+- [ ] 7.4.3 Use this as the verifier for 6.3.3 and 6.3.4 when possible.
+- **Acceptance:** a transposed-matrix mistake is detected by this check in a test.
+
+### 7.5 Confidence label
+- [ ] 7.5.1 Combine verification level, number of repair attempts, lint findings left, and LLM involvement into `verified | partial | unverified`.
+- [ ] 7.5.2 Document the rule so it is predictable.
+- **Acceptance:** the label for the corpus is stable and reviewed.
+
+---
+
+## Phase 8: Command-line interface and reports
+
+### 8.1 Commands
+- [ ] 8.1.1 `translate`: inputs, `--from`, `--to`, `--stage`, `--entry`, `-D`, `-I`, `--out`, `--force`, `--llm/--no-llm`, `--max-attempts`, `--verify-level`, `--report`.
+- [x] 4.3.7 GLSL-to-Vulkan rules `VKG001`-`VKG004` (`analysis/vulkan_glsl.py`), checked against glslangValidator 15.1.0 and 16.2.0 on a 26-snippet table. *(VERIFY: base-vertex semantics of `gl_VertexIndex`. Not done: `fix` for these rules.)*
+- [x] 13.x Optional AI extra: the SDK is `shaderflux[ai]`, imported lazily; a plain install is 14 packages; a `lean-install` CI job guards it. Pre-commit hooks (`.pre-commit-hooks.yaml`) run for real. *(Not done: publish to PyPI, so `pip install shaderflux[ai]` only works from a clone until a release exists.)*
+- [x] 8.1.2 `fix`: deterministic fixes for BND001 and MAT002 (insertions only; dry run by default; `--write`, `--out`, `--only`, `--check`). *(Changed from "shader + log": no AI needed. `--verify` recompiles with DXC and checks bindings. Not done: other rules. The real-DXC tests ran in CI against DXC 1.9 (Linux) and passed; they skip locally.)*
+- [ ] 8.1.3 `lint`: see 4.6.
+- [ ] 8.1.4 `explain`: show the report for a previous run in plain language.
+- [ ] 8.1.5 `doctor`: see 2.3.
+- [ ] 8.1.6 `config show`.
+- [ ] 8.1.7 `batch` and `permutations`: see Phase 9.
+- **Acceptance:** `--help` for each command is complete and reviewed.
+
+### 8.2 Output behaviour
+- [ ] 8.2.1 Human output via Rich, plain output when not a TTY or with `--no-color`.
+- [ ] 8.2.2 `--json` for machine consumers on every command.
+- [ ] 8.2.3 Exit codes: 0 success, 1 verification or lint findings, 2 usage or environment error, 3 tool or LLM failure.
+- [ ] 8.2.4 `--verbose` and `--quiet`.
+- [ ] 8.2.5 Clear, actionable error messages that name the fix (for example the install hint for a missing tool).
+- **Acceptance:** snapshot tests for help text and error messages.
+
+### 8.3 Report format
+- [x] 8.3.1 JSON report (source of truth) and a Markdown renderer.
+- [ ] 8.3.2 Contents: inputs and hashes, effective config, tool versions, route taken, each attempt, diffs, diagnostics, lint findings, verification results, LLM usage, confidence label, timestamps. *(Partial: input hash, route, every step with tool versions, diagnostics, porting risks, repair attempts and diff, model, prompt version and token use are recorded; the effective configuration is not.)*
+- [ ] 8.3.3 Report schema versioned and documented. *(Partial: the report carries `schema_version`; the schema is not documented yet.)*
+- [ ] 8.3.4 Optional HTML renderer later.
+- **Acceptance:** a report from the corpus validates against the schema.
+
+### 8.4 Usability
+- [ ] 8.4.1 Shell completion.
+- [ ] 8.4.2 `--dry-run` for every command that writes files or calls the LLM.
+- [ ] 8.4.3 A `shaderflux init` that writes a commented starter `shaderflux.toml`.
+- **Acceptance:** a new user can go from install to a first translation using only the CLI help.
+
+---
+
+## Phase 9: Batch and permutations
+
+### 9.1 Batch
+- [ ] 9.1.1 Accept a directory or glob, mirror structure in the output.
+- [ ] 9.1.2 Run files in parallel with a configurable limit. Respect LLM rate limits.
+- [ ] 9.1.3 Continue on failure and summarise at the end.
+- [ ] 9.1.4 Resume support using the cache from 3.6.5.
+- **Acceptance:** a 50-shader corpus run is repeatable and fast on a second run.
+
+### 9.2 Permutations
+- [ ] 9.2.1 Define a permutation spec (`permutations.toml`): defines with allowed values, constraints, exclusions.
+- [ ] 9.2.2 Expand the spec and prune invalid combinations. Report the count before running.
+- [ ] 9.2.3 Warn when the count is large (the cost grows exponentially with independent defines).
+- [ ] 9.2.4 Translate each permutation deterministically first. Use the LLM only for failing ones, and try to reuse a fix across permutations that fail the same way.
+- [ ] 9.2.5 Summary table: permutation, status, verification level.
+- **Acceptance:** a 5-define shader with two exclusions expands to the expected number of permutations.
+
+---
+
+## Phase 10: Test corpus and evaluation
+
+### 10.1 Corpus
+- [ ] 10.1.1 Create `tests/corpus/` with a manifest (`manifest.toml`): ID, language, stage, origin, license, expected route, tags.
+- [ ] 10.1.2 Write original shaders only, or use permissively licensed ones with clear attribution. No proprietary code.
+- [ ] 10.1.3 Categories: trivial, constant buffers, textures and samplers, compute with UAVs, matrix-heavy, intrinsic-heavy, macro-heavy, multi-file, intentionally broken.
+- [ ] 10.1.4 Target size: 10 shaders at M1, 40 at M3, 100 at release.
+- [ ] 10.1.5 For each, record the expected outcome and the verification level it should reach.
+- **Acceptance:** corpus loader and manifest validator in CI.
+
+### 10.2 Metrics and benchmark harness
+- [ ] 10.2.1 Metrics: deterministic success rate, repair success rate, mean attempts, tokens and cost per shader, wall time, verification level distribution.
+- [ ] 10.2.2 `scripts/benchmark.py` runs the corpus and writes JSON + Markdown.
+- [ ] 10.2.3 Store results with tool versions and model name so runs are comparable.
+- [ ] 10.2.4 Baseline comparison: deterministic chain alone versus with LLM repair. This shows whether the LLM adds value.
+- [ ] 10.2.5 Document how to reproduce results.
+- **Acceptance:** a results table in `docs/benchmarks.md` generated by the script.
+
+### 10.3 Regression safeguards
+- [ ] 10.3.1 CI compares benchmark results to a stored baseline for the deterministic path (no API cost) and fails on regressions.
+- [ ] 10.3.2 LLM benchmark runs manually or on a schedule, never on every PR.
+- **Acceptance:** an intentional regression is caught in a test PR.
+
+---
+
+## Phase 11: Documentation
+
+- [ ] 11.1 `docs/getting-started.md`: install tools per OS, install the package, run the first translation.
+- [ ] 11.2 `docs/guides/hlsl-to-glsl.md`, `glsl-to-hlsl.md`, `hlsl-to-spirv.md`: what is automatic, what is checked, common pitfalls.
+- [ ] 11.3 `docs/guides/bindings.md`: how register spaces map to descriptor sets, with diagrams.
+- [ ] 11.4 `docs/matrix-conventions.md`: from 4.3.1.
+- [ ] 11.5 `docs/guides/permutations.md`.
+- [ ] 11.6 `docs/privacy.md`: from 5.6.
+- [ ] 11.7 `docs/architecture.md` kept in sync with the code.
+- [ ] 11.8 `docs/reference/cli.md` generated from the CLI definitions.
+- [ ] 11.9 `docs/reference/report-schema.md`.
+- [ ] 11.10 `docs/troubleshooting.md`: top errors and fixes, `doctor` output explained.
+- [ ] 11.11 `examples/`: three runnable example projects with expected outputs.
+- [ ] 11.12 Docs site (MkDocs or similar) published from CI once there is enough content.
+- **Acceptance:** a person who has never seen the project completes the getting-started guide without help (test with one outside reader).
+
+---
+
+## Phase 12: Release and distribution
+
+### 12.1 Versioning and release process
+- [ ] 12.1.1 Semantic versioning, `0.x` until the CLI and report schema stabilise.
+- [ ] 12.1.2 Release checklist in `docs/releasing.md`.
+- [ ] 12.1.3 GitHub Actions release workflow: build sdist and wheel, run tests, publish to TestPyPI first, then PyPI using trusted publishing.
+- [ ] 12.1.4 Generate release notes from the changelog.
+- **Acceptance:** a release candidate installs from TestPyPI in a clean environment.
+
+### 12.2 Docker image
+- [ ] 12.2.1 Image with Python, the pinned shader tools, and the package.
+- [ ] 12.2.2 Document how to mount a shader directory and pass the API key.
+- [ ] 12.2.3 Scan the image for vulnerabilities in CI.
+- **Acceptance:** `docker run` translates a corpus shader with no local installs.
+
+### 12.3 Pre-release checks
+- [ ] 12.3.1 Security review: subprocess handling, temp files, path traversal in includes and output paths, prompt injection handling, secrets in logs.
+- [ ] 12.3.2 License review of dependencies and bundled data.
+- [ ] 12.3.3 Test on Windows, macOS and Linux with real tools.
+- [ ] 12.3.4 Dogfood on at least three real ports (your own or volunteers').
+- [ ] 12.3.5 Update README status from "early planning" to the actual state, remove "(planned)" labels only for features that exist.
+- **Acceptance:** v0.1.0 tagged (milestone M4).
+
+---
+
+## Phase 13: Extension points and experimental work (after v0.1)
+
+### 13.1 Console adapter interface
+- [ ] 13.1.1 Define a plugin interface (`entry_points`) for pre-conversion steps that turn a proprietary dialect into plain HLSL.
+- [ ] 13.1.2 Ship only an example adapter that works on a made-up toy dialect, so the mechanism is demonstrated without proprietary content.
+- [ ] 13.1.3 Document that users must have their own legal access to any SDK.
+
+### 13.2 More targets
+- [ ] 13.2.1 MSL output polish and tests.
+- [ ] 13.2.2 WGSL via Naga or Tint if the spike (2.9.2) was positive.
+- [ ] 13.2.3 Slang as an alternative route if the spike (2.9.1) was positive.
+
+### 13.3 Render pipeline analysis (experimental)
+This was a README feature. It is the least defined, so it starts as analysis only.
+- [ ] 13.3.1 Define the input: a description of passes and draw calls (a simple JSON format, or imported from a capture tool). **DECISION** needed on which capture format to support, if any.
+- [ ] 13.3.2 Detect easy wins: redundant state changes, passes that could merge, unnecessary transitions.
+- [ ] 13.3.3 Output suggestions only. No automatic rewriting.
+- [ ] 13.3.4 Evaluate usefulness with two real examples before building more.
+
+### 13.4 Editor and CI integrations
+- [x] 13.4.1 GitHub Action wrapper running `lint` on shader changes in PRs. *(Built as `action.yml` + `scripts/action-lint.sh`. The script has tests including injection attempts, and CI runs the action itself on this repository's shaders (`action-smoke` job). The SARIF upload step has never run, and `codeql-action/upload-sarif@v3` must be checked against the current major version.)*
+- [ ] 13.4.2 VS Code problem-matcher or SARIF viewing guide.
+
+---
+
+## Phase 14: Community and maintenance
+
+- [ ] 14.1 Triage routine for issues, labels, response targets.
+- [ ] 14.2 "Porting problem" issue template feeds new corpus cases (with user permission and a license check).
+- [ ] 14.3 Monthly tool-version check (see 1.4.6) and a policy for bumping pinned versions.
+- [ ] 14.4 Public roadmap kept in README and issues.
+- [ ] 14.5 Document how to add a new backend, lint rule, prompt, or corpus shader.
+
+---
+
+## Milestones
+
+| Milestone | Contents | Exit criteria |
+| --- | --- | --- |
+| **M0** | Phase 1 | CI green on skeleton, licenses and templates in place |
+| **M1** | Phases 2 and 3 | Deterministic HLSL to GLSL/SPIR-V works from the CLI on a 10-shader corpus |
+| **M2** | Phase 4 | `lint` and `doctor` usable, matrix convention table written with evidence |
+| **M3** | Phases 5, 6, 7 (levels 0 to 3) | LLM repair with offline-replay tests and verification up to reflection equivalence |
+| **M4** | Phases 8, 10, 11, 12 | Reports, benchmarks, docs, v0.1.0 release |
+| **M5** | Phases 7.3/7.4, 9 | Image and numeric verification, batch and permutations |
+| **M6** | Phases 13, 14 | Plugins, extra targets, experimental pipeline analysis |
+
+---
+
+## Risk register
+
+| Risk | Likelihood | Impact | Mitigation |
+| --- | --- | --- | --- |
+| External tools change behaviour or lose maintenance | Medium | High | Pinned versions, weekly drift CI, pluggable backends, maintenance check in 2.1.3 |
+| LLM produces plausible but wrong shaders | High | High | Verification levels, reflection and numeric checks, confidence labels, diffs for human review |
+| Matrix and convention bugs slip through | High | High | Experiment-based convention table, dedicated lint rules, numeric tests |
+| Software rasterizer results differ from real GPUs | Medium | Medium | Label as regression aid, document limits, optional only |
+| Users send confidential code to a third party | Medium | High | Off by default, dry-run, redaction, clear privacy docs |
+| Prompt injection through shader comments | Medium | Medium | Delimited data, schema-validated output, patch guardrails, adversarial tests |
+| API cost surprises | Medium | Medium | Token estimates, budget ceilings, deterministic-first approach |
+| Scope creep into engines or pipelines | High | Medium | Experimental phase, decision records, milestone gates |
+| Installation of external tools is hard for users | High | Medium | `doctor` with install hints, Docker image |
+| Legal exposure from proprietary shader content | Low | High | Corpus rules, no console code, license manifest |
+| Single-maintainer bandwidth | High | Medium | Small milestones, good docs, contribution templates |
+
+---
+
+## Definition of done (applies to every task)
+1. Code merged with tests (unit, and integration where tools are involved).
+2. Lint and type checks pass in CI.
+3. Docs updated (user-facing change means a docs change).
+4. Changelog entry added.
+5. Any **VERIFY** items in the task were resolved and the evidence recorded.
+6. No proprietary content, secrets or absolute local paths committed.
+
+---
+
+## Open questions for review
+1. Approve or change decisions D1 to D9.
+2. Is v0.1 allowed to ship without image comparison (7.3)? My recommendation: yes.
+3. Should Slang be evaluated early (2.9.1), since it could replace parts of the chain?
+4. How many real shaders can you contribute for dogfooding in 12.3.4, and under what license?
+5. Do you want the render pipeline analysis feature kept in the README, or removed until it is better defined?

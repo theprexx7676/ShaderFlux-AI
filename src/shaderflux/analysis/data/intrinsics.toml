@@ -1,0 +1,208 @@
+# HLSL <-> GLSL intrinsic mapping.
+#
+# Provenance: written from general knowledge and cross-checked against Microsoft's
+# GLSL-to-HLSL reference (https://learn.microsoft.com/en-us/windows/uwp/gaming/glsl-to-hlsl-reference).
+# `evidence` says how each *claim* was established:
+#   verified   - observed in real SPIRV-Cross output during development
+#   documented - stated in official documentation
+#   unverified - believed correct, still to be checked (plan task 4.4.1)
+#
+# Only entries with `flag = true` produce lint findings. The rest are kept so that
+# `shaderflux explain` and future prompts can show the mapping.
+
+[[intrinsic]]
+hlsl = "fmod"
+glsl = "mod"
+flag = true
+rule = "INT001"
+title = "fmod and mod round differently for negative numbers"
+note = "HLSL fmod truncates toward zero; GLSL mod uses floor. They agree for positive values and differ for negative ones."
+fix = "Use the one that matches the original behaviour. SPIRV-Cross emulates GLSL mod in HLSL as x - y * floor(x / y)."
+evidence = "verified"
+
+[[intrinsic]]
+glsl = "inverse"
+flag = true
+rule = "INT002"
+title = "inverse() has no HLSL intrinsic"
+note = "HLSL has no matrix inverse intrinsic. SPIRV-Cross generates a helper (spvInverse, several dozen lines using determinants) once per shader."
+fix = "Compute the inverse on the CPU and upload it as a constant when it does not change per pixel."
+evidence = "verified"
+
+[[intrinsic]]
+hlsl = "round"
+glsl = "round"
+flag = true
+rule = "INT003"
+title = "round() halfway cases are not guaranteed to match"
+note = "GLSL leaves halfway rounding implementation-dependent and offers roundEven for round-half-to-even; HLSL round behaviour for halves should be checked in its reference."
+fix = "Use roundEven (GLSL) when the exact halfway behaviour matters, and test both sides."
+evidence = "unverified"
+
+[[intrinsic]]
+hlsl = "saturate"
+glsl = "clamp(x, 0.0, 1.0)"
+evidence = "documented"
+
+[[intrinsic]]
+hlsl = "frac"
+glsl = "fract"
+evidence = "documented"
+
+[[intrinsic]]
+hlsl = "lerp"
+glsl = "mix"
+evidence = "documented"
+
+[[intrinsic]]
+hlsl = "rsqrt"
+glsl = "inversesqrt"
+evidence = "documented"
+
+[[intrinsic]]
+hlsl = "ddx"
+glsl = "dFdx"
+evidence = "documented"
+
+[[intrinsic]]
+hlsl = "ddy"
+glsl = "dFdy"
+evidence = "documented"
+
+[[intrinsic]]
+hlsl = "ddx_coarse"
+glsl = "dFdxCoarse"
+evidence = "documented"
+
+[[intrinsic]]
+hlsl = "ddy_coarse"
+glsl = "dFdyCoarse"
+evidence = "documented"
+
+[[intrinsic]]
+hlsl = "ddx_fine"
+glsl = "dFdxFine"
+evidence = "documented"
+
+[[intrinsic]]
+hlsl = "ddy_fine"
+glsl = "dFdyFine"
+evidence = "documented"
+
+[[intrinsic]]
+hlsl = "atan2"
+glsl = "atan"
+note = "GLSL atan(y, x) is the two-argument form."
+evidence = "documented"
+
+[[intrinsic]]
+hlsl = "rcp"
+glsl = "1.0 / x"
+evidence = "documented"
+
+[[intrinsic]]
+hlsl = "mad"
+glsl = "fma or a * b + c"
+evidence = "documented"
+
+[[intrinsic]]
+hlsl = "clip"
+glsl = "if (x < 0.0) discard;"
+evidence = "documented"
+
+[[intrinsic]]
+hlsl = "mul"
+glsl = "operator * (operands swap)"
+note = "mul(v, M) in HLSL corresponds to M * v in GLSL when matrices are stored the way SPIRV-Cross does."
+evidence = "verified"
+
+[[intrinsic]]
+hlsl = "asfloat"
+glsl = "uintBitsToFloat / intBitsToFloat"
+evidence = "documented"
+
+[[intrinsic]]
+hlsl = "asuint"
+glsl = "floatBitsToUint"
+evidence = "documented"
+
+[[intrinsic]]
+hlsl = "asint"
+glsl = "floatBitsToInt"
+evidence = "documented"
+
+[[intrinsic]]
+hlsl = "countbits"
+glsl = "bitCount"
+evidence = "documented"
+
+[[intrinsic]]
+hlsl = "firstbithigh"
+glsl = "findMSB"
+evidence = "documented"
+
+[[intrinsic]]
+hlsl = "firstbitlow"
+glsl = "findLSB"
+evidence = "documented"
+
+[[intrinsic]]
+hlsl = "reversebits"
+glsl = "bitfieldReverse"
+evidence = "documented"
+
+[[intrinsic]]
+hlsl = "Texture.Sample"
+glsl = "texture"
+evidence = "verified"
+
+[[intrinsic]]
+hlsl = "Texture.SampleLevel"
+glsl = "textureLod"
+evidence = "documented"
+
+[[intrinsic]]
+hlsl = "Texture.SampleGrad"
+glsl = "textureGrad"
+evidence = "documented"
+
+[[intrinsic]]
+hlsl = "Texture.Load"
+glsl = "texelFetch"
+evidence = "documented"
+
+[[intrinsic]]
+hlsl = "Texture.GetDimensions"
+glsl = "textureSize"
+evidence = "documented"
+
+[[intrinsic]]
+hlsl = "InterlockedAdd"
+glsl = "atomicAdd"
+evidence = "documented"
+
+[[intrinsic]]
+hlsl = "GroupMemoryBarrierWithGroupSync"
+glsl = "memoryBarrierShared(); barrier();"
+evidence = "documented"
+
+[[intrinsic]]
+hlsl = "SV_DispatchThreadID"
+glsl = "gl_GlobalInvocationID"
+evidence = "documented"
+
+[[intrinsic]]
+hlsl = "SV_GroupThreadID"
+glsl = "gl_LocalInvocationID"
+evidence = "documented"
+
+[[intrinsic]]
+hlsl = "SV_GroupID"
+glsl = "gl_WorkGroupID"
+evidence = "documented"
+
+[[intrinsic]]
+hlsl = "SV_VertexID"
+glsl = "gl_VertexIndex"
+note = "SPIRV-Cross maps gl_VertexIndex to SV_VertexID."
+evidence = "verified"

@@ -1,0 +1,50 @@
+name: ShaderFlux lint
+description: Check HLSL and GLSL shaders for known porting traps (colliding bindings, matrix conventions, intrinsic differences).
+author: ShaderFlux-AI contributors
+branding:
+  icon: search
+  color: blue
+
+inputs:
+  paths:
+    description: Space-separated shader files or globs, for example "shaders/**/*.hlsl".
+    required: true
+  fail-on:
+    description: Fail the job at this severity or above (error, warning, note, never).
+    default: error
+  target:
+    description: Porting target. "vulkan" enables the Vulkan-specific rules (HLSL binding collisions and GLSL that Vulkan rejects); "any" skips them, for example for GLSL that stays on OpenGL.
+    default: vulkan
+  sarif-file:
+    description: Where to write the SARIF report.
+    default: shaderflux.sarif
+  upload-sarif:
+    description: Upload the SARIF file to GitHub code scanning (needs `security-events - write`).
+    default: "false"
+  python-version:
+    description: Python version used to run ShaderFlux.
+    default: "3.12"
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+    - name: Install ShaderFlux
+      shell: bash
+      run: python -m pip install --quiet "$GITHUB_ACTION_PATH"
+    - name: Lint shaders
+      shell: bash
+      env:
+        INPUT_PATHS: ${{ inputs.paths }}
+        INPUT_FAIL_ON: ${{ inputs.fail-on }}
+        INPUT_TARGET: ${{ inputs.target }}
+        INPUT_SARIF_FILE: ${{ inputs.sarif-file }}
+      run: bash "$GITHUB_ACTION_PATH/scripts/action-lint.sh"
+    - name: Upload SARIF
+      if: ${{ always() && inputs.upload-sarif == 'true' && hashFiles(inputs.sarif-file) != '' }}
+      uses: github/codeql-action/upload-sarif@v3
+      with:
+        sarif_file: ${{ inputs.sarif-file }}
+        category: shaderflux

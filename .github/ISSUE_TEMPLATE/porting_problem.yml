@@ -1,0 +1,22 @@
+name: Porting problem
+description: A shader translated badly, or a porting pitfall we should detect
+labels: ["shader-corpus"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What went wrong?
+      description: Source language and target, what the output did differently, any error text.
+    validations:
+      required: true
+  - type: textarea
+    id: shader
+    attributes:
+      label: Minimal example shader
+      description: Only code you are allowed to share under an open-source license. No console SDK code.
+  - type: checkboxes
+    id: corpus
+    attributes:
+      label: Corpus permission
+      options:
+        - label: I am allowed to share this shader and agree it may be added to the test corpus under the project's MIT license.
