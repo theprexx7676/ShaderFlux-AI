@@ -16,8 +16,8 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
       - run: uv venv .venv && uv pip install -e ".[dev]"
       - run: .venv/bin/ruff check .
       - run: .venv/bin/ruff format --check .
@@ -31,15 +31,18 @@ jobs:
         python: ["3.11", "3.12", "3.13"]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
-      # setup-uv creates and activates a virtual environment when given a Python version,
-      # so do not create another one (that was the failure in the first CI run).
-      - uses: astral-sh/setup-uv@v5
+      - uses: actions/checkout@v7
+      # setup-uv creates a virtual environment for the given Python version and, with
+      # activate-environment, activates it. Do not create another one with `uv venv` (that was
+      # the failure in the first CI run). setup-uv v5 did this by itself; v7 needs the option,
+      # otherwise `uv pip install` fails with "No virtual environment found".
+      - uses: astral-sh/setup-uv@v7
         with:
           python-version: ${{ matrix.python }}
+          activate-environment: true
       - run: uv pip install -e ".[dev]"
       - run: python -m pytest -m "not needs_tools and not needs_llm and not needs_gpu" --cov --cov-report=xml
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: matrix.os == 'ubuntu-latest' && matrix.python == '3.13'
         with:
           name: coverage
@@ -50,16 +53,17 @@ jobs:
   integration-tests:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Install shader tools
         run: |
           sudo apt-get update
           sudo apt-get install -y spirv-tools glslang-tools spirv-cross glslc
           shaderflux_tools="spirv-val spirv-opt spirv-dis spirv-cross glslangValidator glslc"
           for tool in $shaderflux_tools; do command -v "$tool"; done
-      - uses: astral-sh/setup-uv@v5
+      - uses: astral-sh/setup-uv@v7
         with:
           python-version: "3.12"
+          activate-environment: true
       - run: uv pip install -e ".[dev]"
       - run: python -m shaderflux doctor
         continue-on-error: true  # dxc is expected to be missing (exit 1); this just logs the tool versions
@@ -69,7 +73,7 @@ jobs:
   action-smoke:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: A clean shader passes
         uses: ./
         with:
@@ -118,7 +122,7 @@ jobs:
         dxc: [latest, older]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Install the other shader tools
         run: sudo apt-get update && sudo apt-get install -y spirv-tools glslang-tools spirv-cross glslc
       - name: Choose the DXC release
@@ -141,9 +145,10 @@ jobs:
           echo "$RUNNER_TEMP/dxc/bin" >> "$GITHUB_PATH"
           echo "LD_LIBRARY_PATH=$RUNNER_TEMP/dxc/lib:${LD_LIBRARY_PATH:-}" >> "$GITHUB_ENV"
       - run: dxc --version
-      - uses: astral-sh/setup-uv@v5
+      - uses: astral-sh/setup-uv@v7
         with:
           python-version: "3.12"
+          activate-environment: true
       - run: uv pip install -e ".[dev]"
       - name: What shaderflux sees
         run: python -m shaderflux doctor --json
@@ -157,8 +162,8 @@ jobs:
   lean-install:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - name: Install without any extra
